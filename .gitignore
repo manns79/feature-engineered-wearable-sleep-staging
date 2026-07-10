@@ -1,0 +1,26 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+
+# Local DREAMT data and generated artifacts.
+data/raw/*
+data/interim/*
+data/processed/*
+outputs/*
+
+# Keep directory structure visible in git.
+!data/raw/.gitkeep
+!data/interim/.gitkeep
+!data/interim/split_assignments.csv
+!data/processed/.gitkeep
+!outputs/figures/
+!outputs/metrics/
+!outputs/models/
+!outputs/figures/.gitkeep
+!outputs/metrics/.gitkeep
+!outputs/models/.gitkeep
+
