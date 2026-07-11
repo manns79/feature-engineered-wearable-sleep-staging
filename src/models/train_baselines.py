@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -48,6 +49,7 @@ def elastic_net_logistic_regression(random_state: int = 42) -> ModelSpec:
     """Return multinomial elastic-net logistic regression with class weighting."""
     estimator = Pipeline(
         steps=[
+            ("imputer", SimpleImputer(strategy="median")),
             ("scaler", StandardScaler()),
             (
                 "classifier",
@@ -55,7 +57,6 @@ def elastic_net_logistic_regression(random_state: int = 42) -> ModelSpec:
                     class_weight="balanced",
                     l1_ratio=0.5,
                     max_iter=5000,
-                    penalty="elasticnet",
                     random_state=random_state,
                     solver="saga",
                 ),
@@ -67,17 +68,23 @@ def elastic_net_logistic_regression(random_state: int = 42) -> ModelSpec:
 
 def random_forest(random_state: int = 42) -> ModelSpec:
     """Return a class-weighted random forest classifier."""
-    return ModelSpec(
-        name="random_forest",
-        estimator=RandomForestClassifier(
-            class_weight="balanced",
-            max_depth=None,
-            min_samples_leaf=2,
-            n_estimators=500,
-            n_jobs=-1,
-            random_state=random_state,
-        ),
+    estimator = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            (
+                "classifier",
+                RandomForestClassifier(
+                    class_weight="balanced",
+                    max_depth=None,
+                    min_samples_leaf=2,
+                    n_estimators=500,
+                    n_jobs=-1,
+                    random_state=random_state,
+                ),
+            ),
+        ]
     )
+    return ModelSpec(name="random_forest", estimator=estimator)
 
 
 def xgboost_classifier(random_state: int = 42) -> ModelSpec:

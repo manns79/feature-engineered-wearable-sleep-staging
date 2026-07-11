@@ -28,9 +28,8 @@ learning with richer engineered features.
 ```text
 data/
   raw/          # local DREAMT files; ignored by git
-  interim/      # CSV split assignments and epoch indexes; ignored by git
-  processed/    # CSV feature tables; ignored by git
-  synthetic/    # optional small DREAMT-compatible smoke-test files
+  interim/      # split assignments and epoch indexes; mostly ignored by git
+  processed/    # generated CSV feature tables; ignored by git
 notebooks/
   01_data_exploration.ipynb
   02_feature_exploration.ipynb
@@ -55,9 +54,9 @@ tests should be added alongside each nontrivial behavior.
 
 ## First Milestone
 
-1. Copy or validate the prior project split assignments.
+1. Validate or copy the prior project split assignments.
 2. Build a DREAMT epoch index with preparation epochs excluded.
-3. Extract basic and advanced engineered features into CSV tables.
+3. Extract basic statistical features into split CSV tables.
 4. Train baseline and traditional ML models using validation data for model
    selection.
 5. Reserve the held-out test split for final evaluation after choices are frozen.
@@ -72,3 +71,23 @@ pytest
 python scripts/copy_previous_split.py
 ```
 
+Place local DREAMT participant CSVs such as `S002_whole_df.csv` under
+`data/raw/`. These files are ignored by git and should not be committed.
+
+Then run the first milestone pipeline:
+
+```bash
+python scripts/build_epoch_index.py
+python scripts/build_features.py
+python scripts/train_models.py
+python scripts/evaluate_models.py
+```
+
+If your DREAMT CSVs are not sampled at 64 Hz, pass the correct sampling rate or
+explicit rows per 30-second epoch:
+
+```bash
+python scripts/build_epoch_index.py --sampling-rate-hz 100
+# or
+python scripts/build_epoch_index.py --rows-per-epoch 3000
+```
