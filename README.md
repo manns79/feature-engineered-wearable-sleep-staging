@@ -57,9 +57,9 @@ tests should be added alongside each nontrivial behavior.
 1. Validate or copy the prior project split assignments.
 2. Build a DREAMT epoch index with preparation epochs excluded.
 3. Extract basic statistical features into split CSV tables.
-4. Train baseline and traditional ML models using validation data for model
-   selection.
-5. Reserve the held-out test split for final evaluation after choices are frozen.
+4. Tune baseline and traditional ML models with participant-grouped cross-validation on the training split only.
+5. Evaluate the best fitted model from each family on validation data only.
+6. Reserve the held-out test split for final evaluation after choices are frozen.
 
 ## Quick Start
 
@@ -80,8 +80,12 @@ Then run the first milestone pipeline:
 python scripts/build_epoch_index.py
 python scripts/build_features.py
 python scripts/train_models.py
-python scripts/evaluate_models.py
 ```
+
+`scripts/train_models.py` uses `GroupKFold` on training participants to select
+hyperparameters by macro F1, refits the best model from each family on the full
+training split, and writes validation-only metrics and predictions. The test
+feature table is intentionally not loaded during this milestone.
 
 If your DREAMT CSVs are not sampled at 64 Hz, pass the correct sampling rate or
 explicit rows per 30-second epoch:
