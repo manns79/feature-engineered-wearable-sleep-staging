@@ -7,11 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.config import RAW_SIGNAL_COLUMNS, SPLIT_ORDER, TARGET_LABELS
-from src.data.load_dreamt import (
-    extract_participant_id,
-    list_participant_csvs,
-    load_participant_csv,
-)
+from src.data.load_dreamt import extract_participant_id, list_participant_csvs
 from src.features.acc_features import ACC_MAGNITUDE_COLUMN, accelerometer_magnitude
 from src.features.base_features import summarize_epoch, summarize_signal
 
@@ -23,27 +19,36 @@ def build_basic_feature_table(
     raw_dir: str | Path = "data/raw",
     epoch_index_path: str | Path = "data/interim/epoch_index.csv",
 ) -> pd.DataFrame:
-    """Build one basic statistical feature row per valid 30-second epoch."""
+    """Build one basic statistical feature row per valid 30-second epoch.
+
+    Raw DREAMT files are intentionally loaded one participant at a time. The full
+    64 Hz dataset is large enough that keeping every participant CSV in memory at
+    once can exceed RAM on a normal workstation.
+    """
     epoch_index = load_valid_epoch_index(epoch_index_path)
-    participant_frames = _load_participant_frames(raw_dir)
+    participant_paths = _participant_path_lookup(raw_dir)
     rows: list[dict[str, object]] = []
 
-    for epoch_row in epoch_index.itertuples(index=False):
-        participant_id = str(epoch_row.participant_id)
-        if participant_id not in participant_frames:
+    for participant_id, participant_epochs in epoch_index.groupby(
+        "participant_id", sort=True
+    ):
+        participant_id = str(participant_id)
+        if participant_id not in participant_paths:
             raise ValueError(f"Raw CSV for {participant_id} is missing from {raw_dir}.")
-        participant = participant_frames[participant_id]
-        epoch = participant.iloc[int(epoch_row.start_row) : int(epoch_row.end_row)]
-        features = _basic_epoch_features(epoch)
-        rows.append(
-            {
-                "participant_id": participant_id,
-                "epoch_id": int(epoch_row.epoch_id),
-                "split": str(epoch_row.split),
-                "label": str(epoch_row.mapped_label),
-                **features,
-            }
-        )
+
+        participant = _load_participant_signal_frame(participant_paths[participant_id])
+        for epoch_row in participant_epochs.itertuples(index=False):
+            epoch = participant.iloc[int(epoch_row.start_row) : int(epoch_row.end_row)]
+            features = _basic_epoch_features(epoch)
+            rows.append(
+                {
+                    "participant_id": participant_id,
+                    "epoch_id": int(epoch_row.epoch_id),
+                    "split": str(epoch_row.split),
+                    "label": str(epoch_row.mapped_label),
+                    **features,
+                }
+            )
 
     if not rows:
         return pd.DataFrame(columns=FEATURE_ID_COLUMNS)
@@ -107,13 +112,21 @@ def load_valid_epoch_index(epoch_index_path: str | Path) -> pd.DataFrame:
     return valid.sort_values(["participant_id", "epoch_id"]).reset_index(drop=True)
 
 
-def _load_participant_frames(raw_dir: str | Path) -> dict[str, pd.DataFrame]:
-    """Load participant CSVs keyed by participant ID."""
-    frames: dict[str, pd.DataFrame] = {}
-    for path in list_participant_csvs(raw_dir):
-        participant_id = extract_participant_id(path)
-        frames[participant_id] = load_participant_csv(path)
-    return frames
+def _participant_path_lookup(raw_dir: str | Path) -> dict[str, Path]:
+    """Return participant CSV paths keyed by participant ID."""
+    return {
+        extract_participant_id(path): path for path in list_participant_csvs(raw_dir)
+    }
+
+
+def _load_participant_signal_frame(path: str | Path) -> pd.DataFrame:
+    """Load only signal columns needed for feature extraction."""
+    csv_path = Path(path)
+    available_columns = pd.read_csv(csv_path, nrows=0).columns
+    usecols = [column for column in RAW_SIGNAL_COLUMNS if column in available_columns]
+    if not usecols:
+        raise ValueError(f"{csv_path} does not contain any expected signal columns.")
+    return pd.read_csv(csv_path, usecols=usecols)
 
 
 def _basic_epoch_features(epoch: pd.DataFrame) -> dict[str, float]:
