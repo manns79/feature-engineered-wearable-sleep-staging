@@ -48,9 +48,12 @@ outputs/
   models/
 ```
 
-The numbered notebooks are intentionally not created yet; they should be added
-when the first exploratory pass begins. Reusable logic belongs under `src/`, and
-tests should be added alongside each nontrivial behavior.
+The numbered notebooks are added as each exploratory pass begins.
+`notebooks/01_data_exploration.ipynb` contains the non-predictive data
+exploration pass for participant counts, epoch counts, missingness, recording
+durations, label balance, excluded epochs, and signal schema checks. Reusable
+logic belongs under `src/`, and tests should be added alongside each
+nontrivial behavior.
 
 ## First Milestone
 
@@ -81,6 +84,12 @@ python scripts/build_epoch_index.py
 python scripts/build_features.py
 python scripts/train_models.py
 ```
+
+For descriptive data-quality exploration, run
+`notebooks/01_data_exploration.ipynb` after `data/interim/epoch_index.csv` has
+been generated. The notebook uses the full dataset only for non-predictive
+summaries and should not be used to select features, tune models, or guide
+held-out test decisions.
 
 `scripts/train_models.py` uses `GroupKFold` on training participants to select
 hyperparameters by macro F1, refits the best model from each family on the full
