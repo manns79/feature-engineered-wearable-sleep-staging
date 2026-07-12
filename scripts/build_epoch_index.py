@@ -20,6 +20,23 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--missingness-threshold", type=float, default=1.0)
     parser.add_argument("--no-infer-start-offset", action="store_true")
     parser.add_argument("--min-transition-agreement", type=float, default=0.80)
+    parser.add_argument(
+        "--segmented-epoching",
+        action="store_true",
+        help=(
+            "Opt in to segment-wise epoch alignment around long unmapped-label "
+            "runs. The default preserves the legacy single-offset behavior."
+        ),
+    )
+    parser.add_argument(
+        "--min-segment-boundary-unmapped-epochs",
+        type=float,
+        default=2.0,
+        help=(
+            "Minimum contiguous unmapped-label duration, in epochs, used as a "
+            "segment boundary when --segmented-epoching is enabled."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -35,6 +52,10 @@ def main() -> None:
         missingness_threshold=args.missingness_threshold,
         infer_start_offset=not args.no_infer_start_offset,
         min_transition_agreement=args.min_transition_agreement,
+        segmented_epoching=args.segmented_epoching,
+        min_segment_boundary_unmapped_epochs=(
+            args.min_segment_boundary_unmapped_epochs
+        ),
     )
     print(f"Wrote epoch index to {output}")
 

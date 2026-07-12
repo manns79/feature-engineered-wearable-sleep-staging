@@ -85,6 +85,26 @@ python scripts/build_features.py
 python scripts/train_models.py
 ```
 
+To audit whether participant sleep-stage labels follow a stable 30-second epoch
+phase before rebuilding artifacts, run:
+
+```bash
+python scripts/audit_epoch_alignment.py
+```
+
+The audit writes `outputs/metrics/epoch_alignment_audit.csv` and is useful for
+finding recordings like S077, where one global epoch offset is not a good fit.
+An opt-in segmented epoching mode is available for experiments around long
+unmapped-label gaps:
+
+```bash
+python scripts/build_epoch_index.py \
+  --segmented-epoching \
+  --output data/interim/epoch_index_segmented.csv
+```
+
+The default epoch-index command still uses the original single-offset behavior.
+
 For descriptive data-quality exploration, run
 `notebooks/01_data_exploration.ipynb` after `data/interim/epoch_index.csv` has
 been generated. The notebook uses the full dataset only for non-predictive
