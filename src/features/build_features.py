@@ -13,6 +13,14 @@ from src.features.base_features import summarize_epoch, summarize_signal
 
 FEATURE_ID_COLUMNS = ["participant_id", "epoch_id", "split", "label"]
 SPLIT_OUTPUT_NAMES = {"train": "train", "validation": "val", "test": "test"}
+EPOCH_INDEX_STRING_COLUMNS = {
+    "participant_id": str,
+    "split": str,
+    "raw_label": "string",
+    "mapped_label": "string",
+    "exclusion_reason": "string",
+    "segmentation_reason": "string",
+}
 
 
 def build_basic_feature_table(
@@ -93,7 +101,7 @@ def load_valid_epoch_index(epoch_index_path: str | Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Epoch index CSV does not exist: {path}")
 
-    epoch_index = pd.read_csv(path, dtype={"participant_id": str})
+    epoch_index = pd.read_csv(path, dtype=EPOCH_INDEX_STRING_COLUMNS)
     required = {
         "participant_id",
         "split",
