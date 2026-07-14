@@ -104,6 +104,12 @@ python scripts/build_epoch_index.py \
 ```
 
 The default epoch-index command still uses the original single-offset behavior.
+When segmented epoching is enabled, long unmapped-label regions such as
+preparation (`P`) blocks and long `Missing` spans are treated as segment
+boundaries rather than ordinary indexed epochs. As a result, descriptive
+notebooks may no longer show `P` in raw-label distributions, and missingness
+summaries may drop missing signal values that occurred only inside those
+excluded unmapped regions.
 
 For descriptive data-quality exploration, run
 `notebooks/01_data_exploration.ipynb` after `data/interim/epoch_index.csv` has
