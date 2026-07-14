@@ -64,6 +64,38 @@ nontrivial behavior.
 5. Evaluate the best fitted model from each family on validation data only.
 6. Reserve the held-out test split for final evaluation after choices are frozen.
 
+## Rich Feature Engineering
+
+The default feature-build command now writes the richer engineered feature set:
+
+```bash
+python scripts/build_features.py
+```
+
+This generates train, validation, and test feature CSVs plus
+`data/processed/feature_manifest.csv`. The test feature table is generated only
+so it is available after final model choices are frozen; model selection,
+predictive EDA, and validation comparisons should not load or inspect test
+labels, metrics, or predictions.
+
+The rich feature set is assembled in code from modular feature families:
+
+- basic statistical epoch summaries
+- signal-specific features such as movement intensity and short-window IBI/HRV proxies
+- participant-contained rolling context features
+- whole-night participant-normalized z-score features
+- CSV manifest metadata for signal groups and feature families
+
+Whole-night participant normalization is intentional for this within-night
+retrospective staging target. Learned preprocessing in model pipelines should
+still be fit on the training split only.
+
+To rebuild the original first-milestone statistical table, pass:
+
+```bash
+python scripts/build_features.py --feature-set basic
+```
+
 ## Quick Start
 
 ```bash

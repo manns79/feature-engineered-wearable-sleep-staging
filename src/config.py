@@ -48,3 +48,4 @@ class ProjectPaths:
     features_train: Path = Path("data/processed/features_train.csv")
     features_val: Path = Path("data/processed/features_val.csv")
     features_test: Path = Path("data/processed/features_test.csv")
+    feature_manifest: Path = Path("data/processed/feature_manifest.csv")
