@@ -39,6 +39,7 @@ DEFAULT_CONTEXT_SOURCE_FEATURES = (
     "HR_abs_diff_mean",
 )
 TEMPORARY_CONTEXT_COLUMNS = ("_segment_id",)
+PARTICIPANT_ZSCORE_EXCLUDED_SUFFIXES = ("_valid_fraction",)
 EPOCH_INDEX_STRING_COLUMNS = {
     "participant_id": str,
     "split": str,
@@ -118,6 +119,9 @@ def build_rich_feature_table(
         return pd.DataFrame(columns=FEATURE_ID_COLUMNS)
 
     per_epoch_feature_columns = _feature_columns(epoch_features)
+    participant_zscore_columns = _participant_zscore_source_columns(
+        per_epoch_feature_columns
+    )
     context_columns = [
         column for column in context_source_features if column in epoch_features.columns
     ]
@@ -132,7 +136,7 @@ def build_rich_feature_table(
             group_cols=context_group_columns,
         )
 
-    features = add_participant_zscores(features, per_epoch_feature_columns)
+    features = add_participant_zscores(features, participant_zscore_columns)
     features = features.drop(
         columns=[
             column for column in TEMPORARY_CONTEXT_COLUMNS if column in features.columns
@@ -310,6 +314,15 @@ def _feature_columns(features: pd.DataFrame) -> list[str]:
         column
         for column in features.columns
         if column not in FEATURE_ID_COLUMNS and column not in TEMPORARY_CONTEXT_COLUMNS
+    ]
+
+
+def _participant_zscore_source_columns(feature_columns: list[str]) -> list[str]:
+    """Return per-epoch columns eligible for whole-night participant z-scores."""
+    return [
+        column
+        for column in feature_columns
+        if not column.endswith(PARTICIPANT_ZSCORE_EXCLUDED_SUFFIXES)
     ]
 
 

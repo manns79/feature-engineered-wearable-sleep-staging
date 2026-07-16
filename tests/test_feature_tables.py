@@ -4,6 +4,7 @@ from src.features.build_features import (
     build_and_write_feature_tables,
     build_basic_feature_table,
     build_rich_feature_table,
+    _participant_zscore_source_columns,
     write_split_feature_tables,
 )
 
@@ -86,8 +87,24 @@ def test_build_rich_feature_table_adds_modular_feature_families(tmp_path):
     assert "BVP_mean_roll3_mean" in features.columns
     assert "BVP_mean_roll3_std" in features.columns
     assert "BVP_mean_participant_z" in features.columns
+    assert "BVP_valid_fraction" in features.columns
+    assert "BVP_valid_fraction_participant_z" not in features.columns
+    assert "ACC_MAG_valid_fraction_participant_z" not in features.columns
     assert "_segment_id" not in features.columns
     assert set(features["split"]) == {"train", "validation", "test"}
+
+
+def test_participant_zscore_sources_skip_valid_fraction_features():
+    source_columns = _participant_zscore_source_columns(
+        [
+            "BVP_mean",
+            "BVP_valid_fraction",
+            "ACC_MAG_valid_fraction",
+            "HR_abs_diff_mean",
+        ]
+    )
+
+    assert source_columns == ["BVP_mean", "HR_abs_diff_mean"]
 
 
 def test_build_and_write_feature_tables_writes_csv_manifest(tmp_path):
