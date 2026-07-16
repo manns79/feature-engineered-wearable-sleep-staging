@@ -1,3 +1,4 @@
+import joblib
 import pandas as pd
 from src.models.training import _group_kfold, train_and_evaluate_model_set
 
@@ -86,3 +87,36 @@ def test_train_and_evaluate_model_set_writes_validation_only_outputs(tmp_path):
     assert all("_test_" not in path.name for path in outputs.prediction_paths.values())
     assert all("_test_" not in path.name for path in outputs.confusion_paths.values())
     assert len(outputs.model_paths) == 4
+
+
+def test_train_and_evaluate_model_set_uses_requested_feature_columns(tmp_path):
+    train_path = tmp_path / "features_train.csv"
+    val_path = tmp_path / "features_val.csv"
+    _feature_frame("train", n_participants=6).to_csv(train_path, index=False)
+    _feature_frame("validation", n_participants=3).to_csv(val_path, index=False)
+
+    outputs = train_and_evaluate_model_set(
+        feature_paths={
+            "train": train_path,
+            "validation": val_path,
+        },
+        output_dir=tmp_path / "outputs",
+        include_xgboost=False,
+        cv_splits=3,
+        feature_columns=["BVP_mean"],
+        param_grids={
+            "elastic_net_logistic_regression": {
+                "classifier__C": [1.0],
+                "classifier__l1_ratio": [0.5],
+            },
+            "random_forest": {
+                "classifier__n_estimators": [2],
+                "classifier__max_depth": [None],
+                "classifier__min_samples_leaf": [1],
+                "classifier__max_features": ["sqrt"],
+            },
+        },
+    )
+
+    fitted = joblib.load(outputs.model_paths["elastic_net_logistic_regression"])
+    assert list(fitted.feature_names_in_) == ["BVP_mean"]

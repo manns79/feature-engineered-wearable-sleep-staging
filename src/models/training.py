@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -52,6 +53,7 @@ def train_and_evaluate_model_set(
     cv_splits: int = 5,
     n_jobs: int | None = None,
     param_grids: dict[str, dict[str, list[Any]]] | None = None,
+    feature_columns: Iterable[str] | None = None,
 ) -> TrainingOutputs:
     """Tune on train-only grouped CV, then evaluate best models on validation.
 
@@ -60,8 +62,10 @@ def train_and_evaluate_model_set(
     """
     paths = _feature_paths(feature_paths)
     frames = {split: _load_feature_table(path) for split, path in paths.items()}
-    feature_columns = _feature_columns(frames["train"])
-    _validate_feature_columns(frames, feature_columns)
+    selected_feature_columns = _feature_columns(
+        frames["train"], requested_columns=feature_columns
+    )
+    _validate_feature_columns(frames, selected_feature_columns)
 
     output_root = Path(output_dir)
     metrics_dir = output_root / "metrics"
@@ -76,7 +80,7 @@ def train_and_evaluate_model_set(
     confusion_paths: dict[str, Path] = {}
     model_paths: dict[str, Path] = {}
 
-    X_train = frames["train"][feature_columns]
+    X_train = frames["train"][selected_feature_columns]
     y_train = frames["train"]["label"]
     groups_train = frames["train"]["participant_id"]
     cv = _group_kfold(groups_train, requested_splits=cv_splits)
@@ -113,7 +117,7 @@ def train_and_evaluate_model_set(
 
         split = "validation"
         split_frame = frames[split]
-        X_split = split_frame[feature_columns]
+        X_split = split_frame[selected_feature_columns]
         y_true = split_frame["label"]
         y_pred, probabilities, classes = _predict_model(fitted, X_split)
         metrics = classification_metrics(y_true, y_pred, labels=TARGET_LABELS)
@@ -182,12 +186,34 @@ def _load_feature_table(path: Path) -> pd.DataFrame:
     return frame
 
 
-def _feature_columns(train_frame: pd.DataFrame) -> list[str]:
-    columns = [
-        column for column in train_frame.columns if column not in FEATURE_ID_COLUMNS
-    ]
+def _feature_columns(
+    train_frame: pd.DataFrame, requested_columns: Iterable[str] | None = None
+) -> list[str]:
+    if requested_columns is None:
+        columns = [
+            column for column in train_frame.columns if column not in FEATURE_ID_COLUMNS
+        ]
+        if not columns:
+            raise ValueError("No feature columns found in training feature table.")
+        return columns
+
+    columns = list(requested_columns)
     if not columns:
-        raise ValueError("No feature columns found in training feature table.")
+        raise ValueError("feature_columns must contain at least one feature.")
+
+    id_columns = sorted(set(columns) & set(FEATURE_ID_COLUMNS))
+    if id_columns:
+        raise ValueError(f"feature_columns contains ID/target column(s): {id_columns}")
+
+    duplicates = sorted({column for column in columns if columns.count(column) > 1})
+    if duplicates:
+        raise ValueError(f"feature_columns contains duplicate column(s): {duplicates}")
+
+    missing = sorted(set(columns) - set(train_frame.columns))
+    if missing:
+        raise ValueError(
+            f"training feature table is missing requested column(s): {missing}"
+        )
     return columns
 
 

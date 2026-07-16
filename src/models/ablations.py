@@ -5,8 +5,12 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
+
+from src.features.build_features import FEATURE_ID_COLUMNS
+from src.models.training import TrainingOutputs, train_and_evaluate_model_set
 
 MANIFEST_REQUIRED_COLUMNS = (
     "feature",
@@ -20,6 +24,21 @@ FEATURE_FAMILY_ORDER = (
     "rolling_context",
     "whole_night_subject_normalized",
 )
+DEFAULT_ABLATION_FEATURE_PATHS = {
+    "train": Path("data/processed/features_train.csv"),
+    "validation": Path("data/processed/features_val.csv"),
+}
+
+
+@dataclass(frozen=True)
+class AblationExperimentOutputs:
+    """Paths written by an ablation experiment run."""
+
+    metrics_path: Path
+    cv_results_path: Path
+    best_params_path: Path
+    feature_sets_path: Path
+    run_outputs: dict[str, TrainingOutputs]
 
 
 @dataclass(frozen=True)
@@ -234,6 +253,97 @@ def default_ablation_specs(manifest: pd.DataFrame) -> tuple[AblationSpec, ...]:
     return (*PRIMARY_ABLATION_SPECS, *signal_group_ablation_specs(manifest))
 
 
+def resolve_ablation_specs(
+    manifest: pd.DataFrame, ablation_names: Iterable[str] = ()
+) -> tuple[AblationSpec, ...]:
+    """Return default specs or the named subset requested by a caller."""
+    specs = default_ablation_specs(manifest)
+    names = tuple(ablation_names)
+    if not names:
+        return specs
+
+    specs_by_name = {spec.name: spec for spec in specs}
+    missing = sorted(set(names) - set(specs_by_name))
+    if missing:
+        available = sorted(specs_by_name)
+        raise ValueError(
+            f"Unknown ablation name(s): {missing}. Available ablations: {available}"
+        )
+    return tuple(specs_by_name[name] for name in names)
+
+
+def run_ablation_experiments(
+    feature_paths: dict[str, str | Path] | None = None,
+    manifest_path: str | Path = "data/processed/feature_manifest.csv",
+    output_dir: str | Path = "outputs",
+    *,
+    ablation_names: Iterable[str] = (),
+    include_xgboost: bool = True,
+    random_state: int = 42,
+    cv_splits: int = 5,
+    n_jobs: int | None = None,
+    param_grids: dict[str, dict[str, list[Any]]] | None = None,
+) -> AblationExperimentOutputs:
+    """Run manifest-defined ablations through the training pipeline."""
+    paths = _ablation_feature_paths(feature_paths)
+    manifest = load_feature_manifest(manifest_path)
+    _validate_manifest_against_feature_tables(manifest, paths)
+    specs = resolve_ablation_specs(manifest, ablation_names)
+
+    output_root = Path(output_dir)
+    metrics_dir = output_root / "metrics"
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+
+    run_outputs: dict[str, TrainingOutputs] = {}
+    metric_frames: list[pd.DataFrame] = []
+    cv_result_frames: list[pd.DataFrame] = []
+    best_param_frames: list[pd.DataFrame] = []
+    feature_set_rows: list[dict[str, object]] = []
+
+    for spec in specs:
+        selected_features = spec.select_features(manifest)
+        summary = selected_feature_summary(manifest, spec)
+        output_metadata = _compact_output_metadata(summary)
+        feature_set_rows.append(summary)
+        outputs = train_and_evaluate_model_set(
+            feature_paths=paths,
+            output_dir=output_root,
+            include_xgboost=include_xgboost,
+            random_state=random_state,
+            model_prefix=f"ablation_{spec.name}",
+            cv_splits=cv_splits,
+            n_jobs=n_jobs,
+            param_grids=param_grids,
+            feature_columns=selected_features,
+        )
+        run_outputs[spec.name] = outputs
+
+        metric_frames.append(_annotated_frame(outputs.metrics_path, output_metadata))
+        cv_result_frames.append(
+            _annotated_frame(outputs.cv_results_path, output_metadata)
+        )
+        best_param_frames.append(
+            _annotated_frame(outputs.best_params_path, output_metadata)
+        )
+
+    metrics_path = metrics_dir / "ablation_validation_metrics.csv"
+    cv_results_path = metrics_dir / "ablation_cv_results.csv"
+    best_params_path = metrics_dir / "ablation_best_params.csv"
+    feature_sets_path = metrics_dir / "ablation_feature_sets.csv"
+    _combine_frames(metric_frames).to_csv(metrics_path, index=False)
+    _combine_frames(cv_result_frames).to_csv(cv_results_path, index=False)
+    _combine_frames(best_param_frames).to_csv(best_params_path, index=False)
+    pd.DataFrame(feature_set_rows).to_csv(feature_sets_path, index=False)
+
+    return AblationExperimentOutputs(
+        metrics_path=metrics_path,
+        cv_results_path=cv_results_path,
+        best_params_path=best_params_path,
+        feature_sets_path=feature_sets_path,
+        run_outputs=run_outputs,
+    )
+
+
 def selected_feature_summary(
     manifest: pd.DataFrame, spec: AblationSpec
 ) -> dict[str, object]:
@@ -251,7 +361,66 @@ def selected_feature_summary(
     row["selected_source_signals"] = "|".join(
         sorted(selected_manifest["source_signal"].unique())
     )
+    row["selected_features"] = "|".join(selected)
     return row
+
+
+def _ablation_feature_paths(
+    feature_paths: dict[str, str | Path] | None,
+) -> dict[str, Path]:
+    paths = DEFAULT_ABLATION_FEATURE_PATHS if feature_paths is None else feature_paths
+    required = {"train", "validation"}
+    missing = sorted(required - set(paths))
+    if missing:
+        raise ValueError(f"feature_paths is missing split(s): {missing}")
+    return {split: Path(paths[split]) for split in required}
+
+
+def _validate_manifest_against_feature_tables(
+    manifest: pd.DataFrame, feature_paths: dict[str, Path]
+) -> None:
+    for split, path in feature_paths.items():
+        feature_columns = _feature_table_columns(path)
+        try:
+            validate_manifest_matches_features(manifest, feature_columns)
+        except ValueError as exc:
+            raise ValueError(f"{split} feature table mismatch: {exc}") from exc
+
+
+def _feature_table_columns(path: Path) -> list[str]:
+    if not path.exists():
+        raise FileNotFoundError(f"Feature CSV does not exist: {path}")
+    columns = pd.read_csv(path, nrows=0).columns.tolist()
+    missing = sorted(set(FEATURE_ID_COLUMNS) - set(columns))
+    if missing:
+        raise ValueError(f"{path} is missing required column(s): {missing}")
+    feature_columns = [
+        column for column in columns if column not in FEATURE_ID_COLUMNS
+    ]
+    if not feature_columns:
+        raise ValueError(f"{path} does not contain any feature columns.")
+    return feature_columns
+
+
+def _annotated_frame(path: Path, metadata: dict[str, object]) -> pd.DataFrame:
+    frame = pd.read_csv(path)
+    for column, value in reversed(metadata.items()):
+        frame.insert(0, column, value)
+    return frame
+
+
+def _compact_output_metadata(metadata: dict[str, object]) -> dict[str, object]:
+    return {
+        column: value
+        for column, value in metadata.items()
+        if column != "selected_features"
+    }
+
+
+def _combine_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
+    if not frames:
+        return pd.DataFrame()
+    return pd.concat(frames, ignore_index=True)
 
 
 def _as_tuple(values: Iterable[str] | str) -> tuple[str, ...]:
