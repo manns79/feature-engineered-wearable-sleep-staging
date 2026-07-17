@@ -1,8 +1,8 @@
 import pandas as pd
 import pytest
-
 from src.models.ablations import (
     PRIMARY_ABLATION_SPECS,
+    AblationSpec,
     default_ablation_specs,
     run_ablation_experiments,
     signal_group_ablation_specs,
@@ -99,6 +99,17 @@ def test_primary_ablation_specs_select_cumulative_feature_families():
     ]
 
 
+def test_ablation_spec_accepts_single_string_filters():
+    spec = AblationSpec(
+        name="cardiovascular",
+        description="Cardiovascular features.",
+        signal_groups="cardiovascular",
+    )
+
+    assert spec.signal_groups == ("cardiovascular",)
+    assert spec.select_features(_manifest()) == ["BVP_mean", "HR_abs_diff_mean"]
+
+
 def test_signal_group_specs_are_manifest_driven():
     manifest = _manifest()
     specs = {spec.name: spec for spec in signal_group_ablation_specs(manifest)}
@@ -111,7 +122,7 @@ def test_signal_group_specs_are_manifest_driven():
 
 
 def test_validate_manifest_matches_features_rejects_stale_manifest():
-    with pytest.raises(ValueError, match="missing from manifest"):
+    with pytest.raises(ValueError, match="Missing from manifest"):
         validate_manifest_matches_features(_manifest(), ["BVP_mean", "TEMP_mean"])
 
 

@@ -30,6 +30,12 @@ DEFAULT_ABLATION_FEATURE_PATHS = {
 }
 
 
+def _as_tuple(values: Iterable[str] | str) -> tuple[str, ...]:
+    if isinstance(values, str):
+        return (values,)
+    return tuple(values)
+
+
 @dataclass(frozen=True)
 class AblationExperimentOutputs:
     """Paths written by an ablation experiment run."""
@@ -421,12 +427,6 @@ def _combine_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
-
-
-def _as_tuple(values: Iterable[str] | str) -> tuple[str, ...]:
-    if isinstance(values, str):
-        return (values,)
-    return tuple(values)
 
 
 def _slug(value: str) -> str:
