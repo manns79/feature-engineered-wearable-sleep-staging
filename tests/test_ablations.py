@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 import pytest
 from src.models.ablations import (
@@ -152,17 +154,41 @@ def test_run_ablation_experiments_writes_combined_outputs_without_test_table(tmp
         include_xgboost=False,
         cv_splits=3,
         param_grids=_small_param_grids(),
+        run_id="test_run",
     )
 
     metrics = pd.read_csv(outputs.metrics_path)
     best_params = pd.read_csv(outputs.best_params_path)
     feature_sets = pd.read_csv(outputs.feature_sets_path)
+    status = pd.read_csv(outputs.status_path)
+    run_config = json.loads(outputs.run_config_path.read_text())
     assert set(outputs.run_outputs) == {
         "basic_plus_signal_specific",
         "signal_group_movement",
     }
+    assert outputs.run_dir == tmp_path / "outputs" / "runs" / "test_run"
+    assert outputs.metrics_path.parent == outputs.run_dir / "metrics"
+    assert outputs.log_path.exists()
+    assert outputs.status_path.exists()
+    assert outputs.run_config_path.exists()
+    assert run_config["run_id"] == "test_run"
+    assert run_config["resolved_ablations"] == [
+        "basic_plus_signal_specific",
+        "signal_group_movement",
+    ]
     assert set(metrics["ablation"]) == set(outputs.run_outputs)
     assert set(best_params["ablation"]) == set(outputs.run_outputs)
     assert set(feature_sets["ablation"]) == set(outputs.run_outputs)
+    assert {"ablation_start", "model_start", "model_completed"}.issubset(
+        set(status["event"])
+    )
     assert "selected_features" in feature_sets.columns
+    for ablation, run_output in outputs.run_outputs.items():
+        assert run_output.metrics_path.parent == (
+            outputs.run_dir / "ablations" / ablation / "metrics"
+        )
+        assert all(
+            path.parent == outputs.run_dir / "ablations" / ablation / "models"
+            for path in run_output.model_paths.values()
+        )
     assert not (tmp_path / "features_test.csv").exists()

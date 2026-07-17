@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import logging
+import time
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -11,7 +14,7 @@ import joblib
 import pandas as pd
 from sklearn.base import clone
 from sklearn.metrics import f1_score, make_scorer
-from sklearn.model_selection import GridSearchCV, GroupKFold
+from sklearn.model_selection import GridSearchCV, GroupKFold, ParameterGrid
 from sklearn.preprocessing import LabelEncoder
 
 from src.config import TARGET_LABELS
@@ -29,6 +32,7 @@ DEFAULT_FEATURE_PATHS = {
     "validation": Path("data/processed/features_val.csv"),
 }
 MACRO_F1_SCORER = make_scorer(f1_score, average="macro", zero_division=0)
+ProgressCallback = Callable[[dict[str, object]], None]
 
 
 @dataclass(frozen=True)
@@ -54,6 +58,9 @@ def train_and_evaluate_model_set(
     n_jobs: int | None = None,
     param_grids: dict[str, dict[str, list[Any]]] | None = None,
     feature_columns: Iterable[str] | None = None,
+    logger: logging.Logger | None = None,
+    progress_callback: ProgressCallback | None = None,
+    verbose_search: int = 0,
 ) -> TrainingOutputs:
     """Tune on train-only grouped CV, then evaluate best models on validation.
 
@@ -88,21 +95,98 @@ def train_and_evaluate_model_set(
     specs = default_model_specs(
         random_state=random_state, include_xgboost=include_xgboost
     )
+    _log_info(
+        logger,
+        (
+            "Training model set %s: train_rows=%d validation_rows=%d "
+            "n_features=%d cv_splits=%d"
+        ),
+        model_prefix,
+        len(frames["train"]),
+        len(frames["validation"]),
+        len(selected_feature_columns),
+        cv.get_n_splits(),
+    )
 
     for spec in specs:
-        fitted, cv_results, best_params = _fit_best_model(
-            spec,
-            X_train,
-            y_train,
-            groups_train,
-            cv=cv,
-            param_grid=grids.get(spec.name, {}),
-            n_jobs=n_jobs,
+        param_grid = grids.get(spec.name, {})
+        grid_size = _param_grid_size(param_grid)
+        estimated_fit_count = (
+            grid_size * cv.get_n_splits() + 1 if param_grid else 1
         )
+        started_at = _timestamp()
+        model_start = time.perf_counter()
+        _log_info(
+            logger,
+            (
+                "Starting model %s for %s: grid_size=%d cv_splits=%d "
+                "estimated_fit_count=%d"
+            ),
+            spec.name,
+            model_prefix,
+            grid_size,
+            cv.get_n_splits(),
+            estimated_fit_count,
+        )
+        _emit_progress(
+            progress_callback,
+            {
+                "event": "model_start",
+                "status": "running",
+                "feature_set": model_prefix,
+                "model": spec.name,
+                "n_features": len(selected_feature_columns),
+                "train_rows": len(frames["train"]),
+                "validation_rows": len(frames["validation"]),
+                "grid_size": grid_size,
+                "cv_splits": cv.get_n_splits(),
+                "estimated_fit_count": estimated_fit_count,
+                "started_at": started_at,
+            },
+        )
+        try:
+            fitted, cv_results, best_params = _fit_best_model(
+                spec,
+                X_train,
+                y_train,
+                groups_train,
+                cv=cv,
+                param_grid=param_grid,
+                n_jobs=n_jobs,
+                verbose_search=verbose_search,
+            )
+        except Exception as exc:
+            elapsed_seconds = time.perf_counter() - model_start
+            _log_exception(
+                logger,
+                "Model %s failed for %s after %.1f seconds",
+                spec.name,
+                model_prefix,
+                elapsed_seconds,
+            )
+            _emit_progress(
+                progress_callback,
+                {
+                    "event": "model_failed",
+                    "status": "failed",
+                    "feature_set": model_prefix,
+                    "model": spec.name,
+                    "n_features": len(selected_feature_columns),
+                    "grid_size": grid_size,
+                    "cv_splits": cv.get_n_splits(),
+                    "estimated_fit_count": estimated_fit_count,
+                    "started_at": started_at,
+                    "finished_at": _timestamp(),
+                    "elapsed_seconds": elapsed_seconds,
+                    "message": str(exc),
+                },
+            )
+            raise
         model_path = models_dir / f"{model_prefix}_{spec.name}.joblib"
         joblib.dump(fitted, model_path)
         model_paths[spec.name] = model_path
 
+        best_cv_score = _best_cv_score(cv_results)
         if not cv_results.empty:
             cv_result_frames.append(cv_results.assign(model=spec.name))
         best_param_rows.append(
@@ -110,7 +194,7 @@ def train_and_evaluate_model_set(
                 "model": spec.name,
                 "feature_set": model_prefix,
                 "best_params": best_params,
-                "best_cv_macro_f1": _best_cv_score(cv_results),
+                "best_cv_macro_f1": best_cv_score,
                 "cv_n_splits": cv.get_n_splits(),
             }
         )
@@ -146,6 +230,44 @@ def train_and_evaluate_model_set(
             confusion_path
         )
         confusion_paths[f"{split}:{spec.name}"] = confusion_path
+        elapsed_seconds = time.perf_counter() - model_start
+        _log_info(
+            logger,
+            (
+                "Completed model %s for %s in %.1f seconds: best_cv_macro_f1=%s "
+                "validation_macro_f1=%.4f"
+            ),
+            spec.name,
+            model_prefix,
+            elapsed_seconds,
+            best_cv_score,
+            metrics["macro_f1"],
+        )
+        _emit_progress(
+            progress_callback,
+            {
+                "event": "model_completed",
+                "status": "completed",
+                "feature_set": model_prefix,
+                "model": spec.name,
+                "n_features": len(selected_feature_columns),
+                "train_rows": len(frames["train"]),
+                "validation_rows": len(frames["validation"]),
+                "grid_size": grid_size,
+                "cv_splits": cv.get_n_splits(),
+                "estimated_fit_count": estimated_fit_count,
+                "started_at": started_at,
+                "finished_at": _timestamp(),
+                "elapsed_seconds": elapsed_seconds,
+                "best_params": best_params,
+                "best_cv_macro_f1": best_cv_score,
+                "validation_macro_f1": metrics["macro_f1"],
+                "validation_accuracy": metrics["accuracy"],
+                "model_path": str(model_path),
+                "prediction_path": str(prediction_path),
+                "confusion_path": str(confusion_path),
+            },
+        )
 
     metrics_path = metrics_dir / f"{model_prefix}_validation_metrics.csv"
     cv_results_path = metrics_dir / f"{model_prefix}_cv_results.csv"
@@ -246,6 +368,7 @@ def _fit_best_model(
     cv: GroupKFold,
     param_grid: dict[str, list[Any]],
     n_jobs: int | None,
+    verbose_search: int = 0,
 ) -> tuple[Any, pd.DataFrame, str]:
     if not param_grid:
         estimator = clone(spec.estimator)
@@ -261,6 +384,7 @@ def _fit_best_model(
             cv=cv,
             param_grid=param_grid,
             n_jobs=n_jobs,
+            verbose_search=verbose_search,
         )
 
     search = GridSearchCV(
@@ -271,6 +395,7 @@ def _fit_best_model(
         refit=True,
         n_jobs=n_jobs,
         return_train_score=True,
+        verbose=verbose_search,
     )
     search.fit(X_train, y_train, groups=groups_train)
     return search.best_estimator_, _cv_results_frame(search), repr(search.best_params_)
@@ -285,6 +410,7 @@ def _fit_best_xgboost(
     cv: GroupKFold,
     param_grid: dict[str, list[Any]],
     n_jobs: int | None,
+    verbose_search: int = 0,
 ) -> tuple[dict[str, Any], pd.DataFrame, str]:
     encoder = LabelEncoder()
     encoded = encoder.fit_transform(y_train)
@@ -297,6 +423,7 @@ def _fit_best_xgboost(
         refit=True,
         n_jobs=n_jobs,
         return_train_score=True,
+        verbose=verbose_search,
     )
     search.fit(X_train, encoded, groups=groups_train, sample_weight=sample_weight)
     fitted = {"estimator": search.best_estimator_, "label_encoder": encoder}
@@ -353,6 +480,33 @@ def _best_cv_score(cv_results: pd.DataFrame) -> object:
     if cv_results.empty or cv_results["mean_test_score"].isna().all():
         return pd.NA
     return float(cv_results.sort_values("rank_test_score").iloc[0]["mean_test_score"])
+
+
+def _param_grid_size(param_grid: dict[str, list[Any]]) -> int:
+    if not param_grid:
+        return 0
+    return len(ParameterGrid(param_grid))
+
+
+def _timestamp() -> str:
+    return datetime.now(UTC).isoformat(timespec="seconds")
+
+
+def _emit_progress(
+    progress_callback: ProgressCallback | None, event: dict[str, object]
+) -> None:
+    if progress_callback is not None:
+        progress_callback(event)
+
+
+def _log_info(logger: logging.Logger | None, message: str, *args: object) -> None:
+    if logger is not None:
+        logger.info(message, *args)
+
+
+def _log_exception(logger: logging.Logger | None, message: str, *args: object) -> None:
+    if logger is not None:
+        logger.exception(message, *args)
 
 
 def _predict_model(

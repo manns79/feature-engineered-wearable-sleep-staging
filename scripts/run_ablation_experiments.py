@@ -18,6 +18,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--n-jobs", type=int, default=None)
     parser.add_argument("--skip-xgboost", action="store_true")
     parser.add_argument(
+        "--run-id",
+        default=None,
+        help="Optional run directory name under OUTPUT_DIR/runs/.",
+    )
+    parser.add_argument(
+        "--verbose-search",
+        type=int,
+        default=0,
+        help="Verbosity passed through to sklearn GridSearchCV.",
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Do not stream progress logs to the console; always write run.log.",
+    )
+    parser.add_argument(
         "--ablation",
         action="append",
         default=[],
@@ -49,7 +65,14 @@ def main() -> None:
         random_state=args.random_state,
         cv_splits=args.cv_splits,
         n_jobs=args.n_jobs,
+        run_id=args.run_id,
+        log_to_console=not args.quiet,
+        verbose_search=args.verbose_search,
     )
+    print(f"Wrote run artifacts under {outputs.run_dir}")
+    print(f"Wrote run log to {outputs.log_path}")
+    print(f"Wrote run status to {outputs.status_path}")
+    print(f"Wrote run config to {outputs.run_config_path}")
     print(f"Wrote combined validation metrics to {outputs.metrics_path}")
     print(f"Wrote combined grouped-CV results to {outputs.cv_results_path}")
     print(f"Wrote combined best parameters to {outputs.best_params_path}")
