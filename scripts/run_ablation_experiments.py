@@ -34,6 +34,16 @@ def parse_args() -> argparse.Namespace:
         help="Do not stream progress logs to the console; always write run.log.",
     )
     parser.add_argument(
+        "--resume",
+        "--skip-completed",
+        action="store_true",
+        dest="skip_completed",
+        help=(
+            "Reuse complete per-ablation artifacts in the selected run directory "
+            "and run only missing or incomplete ablations."
+        ),
+    )
+    parser.add_argument(
         "--ablation",
         action="append",
         default=[],
@@ -68,6 +78,7 @@ def main() -> None:
         run_id=args.run_id,
         log_to_console=not args.quiet,
         verbose_search=args.verbose_search,
+        skip_completed=args.skip_completed,
     )
     print(f"Wrote run artifacts under {outputs.run_dir}")
     print(f"Wrote run log to {outputs.log_path}")

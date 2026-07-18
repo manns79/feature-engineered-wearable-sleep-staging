@@ -192,3 +192,52 @@ def test_run_ablation_experiments_writes_combined_outputs_without_test_table(tmp
             for path in run_output.model_paths.values()
         )
     assert not (tmp_path / "features_test.csv").exists()
+
+
+def test_run_ablation_experiments_can_skip_completed_ablations(tmp_path):
+    train_path = tmp_path / "features_train.csv"
+    val_path = tmp_path / "features_val.csv"
+    manifest_path = tmp_path / "feature_manifest.csv"
+    _feature_frame("train").to_csv(train_path, index=False)
+    _feature_frame("validation", n_participants=3).to_csv(val_path, index=False)
+    _manifest().to_csv(manifest_path, index=False)
+    feature_paths = {
+        "train": train_path,
+        "validation": val_path,
+    }
+
+    first_outputs = run_ablation_experiments(
+        feature_paths=feature_paths,
+        manifest_path=manifest_path,
+        output_dir=tmp_path / "outputs",
+        ablation_names=("basic_plus_signal_specific",),
+        include_xgboost=False,
+        cv_splits=3,
+        param_grids=_small_param_grids(),
+        run_id="resumable_run",
+    )
+
+    second_outputs = run_ablation_experiments(
+        feature_paths=feature_paths,
+        manifest_path=manifest_path,
+        output_dir=tmp_path / "outputs",
+        ablation_names=("basic_plus_signal_specific",),
+        include_xgboost=False,
+        cv_splits=3,
+        param_grids={
+            "elastic_net_logistic_regression": {
+                "classifier__not_a_real_parameter": [1.0],
+            }
+        },
+        run_id="resumable_run",
+        skip_completed=True,
+    )
+
+    status = pd.read_csv(second_outputs.status_path)
+    run_config = json.loads(second_outputs.run_config_path.read_text())
+    metrics = pd.read_csv(second_outputs.metrics_path)
+    assert second_outputs.run_dir == first_outputs.run_dir
+    assert set(second_outputs.run_outputs) == {"basic_plus_signal_specific"}
+    assert set(metrics["ablation"]) == {"basic_plus_signal_specific"}
+    assert "ablation_skipped_completed" in set(status["event"])
+    assert run_config["skip_completed"] is True

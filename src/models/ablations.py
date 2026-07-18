@@ -14,6 +14,7 @@ from typing import Any
 import pandas as pd
 
 from src.features.build_features import FEATURE_ID_COLUMNS
+from src.models.train_baselines import default_model_specs
 from src.models.training import TrainingOutputs, train_and_evaluate_model_set
 
 MANIFEST_REQUIRED_COLUMNS = (
@@ -326,6 +327,7 @@ def run_ablation_experiments(
     run_id: str | None = None,
     log_to_console: bool = False,
     verbose_search: int = 0,
+    skip_completed: bool = False,
 ) -> AblationExperimentOutputs:
     """Run manifest-defined ablations through the training pipeline."""
     paths = _ablation_feature_paths(feature_paths)
@@ -343,10 +345,12 @@ def run_ablation_experiments(
     status_path = run_root / "run_status.csv"
     run_config_path = run_root / "run_config.json"
     logger = _configure_run_logger(log_path, log_to_console=log_to_console)
-    status_rows: list[dict[str, object]] = []
+    status_rows = _load_status_rows(status_path) if skip_completed else []
     started_at = _timestamp()
 
     logger.info("Starting ablation run in %s", run_root)
+    if skip_completed:
+        logger.info("Resume/skip-completed mode is enabled")
     logger.info(
         "Inputs: train=%s validation=%s manifest=%s",
         paths["train"],
@@ -372,6 +376,7 @@ def run_ablation_experiments(
             "cv_splits": cv_splits,
             "n_jobs": n_jobs,
             "verbose_search": verbose_search,
+            "skip_completed": skip_completed,
         },
     )
     _write_status(status_path, status_rows)
@@ -390,6 +395,46 @@ def run_ablation_experiments(
         output_metadata = _compact_output_metadata(summary)
         feature_set_rows.append(summary)
         ablation_output_dir = ablations_dir / spec.name
+        expected_outputs = _expected_training_outputs(
+            ablation_output_dir,
+            model_prefix=f"ablation_{spec.name}",
+            include_xgboost=include_xgboost,
+            random_state=random_state,
+        )
+        if skip_completed and _training_outputs_complete(expected_outputs):
+            logger.info(
+                "Reusing completed ablation %s from %s",
+                spec.name,
+                ablation_output_dir,
+            )
+            outputs = expected_outputs
+            run_outputs[spec.name] = outputs
+            metric_frames.append(
+                _annotated_frame(outputs.metrics_path, output_metadata)
+            )
+            cv_result_frames.append(
+                _annotated_frame(outputs.cv_results_path, output_metadata)
+            )
+            best_param_frames.append(
+                _annotated_frame(outputs.best_params_path, output_metadata)
+            )
+            _append_status(
+                status_rows,
+                status_path,
+                {
+                    "event": "ablation_skipped_completed",
+                    "status": "completed",
+                    "ablation": spec.name,
+                    "n_features": len(selected_features),
+                    "started_at": ablation_started_at,
+                    "finished_at": _timestamp(),
+                    "elapsed_seconds": time.perf_counter() - ablation_start,
+                    "message": "Reused complete per-ablation artifacts.",
+                    "output_dir": str(ablation_output_dir),
+                },
+            )
+            continue
+
         logger.info(
             "Starting ablation %s: n_features=%d families=%s signal_groups=%s",
             spec.name,
@@ -596,6 +641,61 @@ def _combine_frames(frames: list[pd.DataFrame]) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
+def _expected_training_outputs(
+    output_dir: Path,
+    *,
+    model_prefix: str,
+    include_xgboost: bool,
+    random_state: int,
+) -> TrainingOutputs:
+    metrics_dir = output_dir / "metrics"
+    models_dir = output_dir / "models"
+    split = "validation"
+    model_names = [
+        spec.name
+        for spec in default_model_specs(
+            random_state=random_state, include_xgboost=include_xgboost
+        )
+    ]
+    return TrainingOutputs(
+        metrics_path=metrics_dir / f"{model_prefix}_validation_metrics.csv",
+        cv_results_path=metrics_dir / f"{model_prefix}_cv_results.csv",
+        best_params_path=metrics_dir / f"{model_prefix}_best_params.csv",
+        prediction_paths={
+            f"{split}:{model_name}": (
+                metrics_dir / f"{model_prefix}_{split}_{model_name}_predictions.csv"
+            )
+            for model_name in model_names
+        },
+        confusion_paths={
+            f"{split}:{model_name}": (
+                metrics_dir / f"{model_prefix}_{split}_{model_name}_confusion.csv"
+            )
+            for model_name in model_names
+        },
+        model_paths={
+            model_name: models_dir / f"{model_prefix}_{model_name}.joblib"
+            for model_name in model_names
+        },
+    )
+
+
+def _training_outputs_complete(outputs: TrainingOutputs) -> bool:
+    required_paths = [
+        outputs.metrics_path,
+        outputs.cv_results_path,
+        outputs.best_params_path,
+        *outputs.prediction_paths.values(),
+        *outputs.confusion_paths.values(),
+        *outputs.model_paths.values(),
+    ]
+    return all(_non_empty_file(path) for path in required_paths)
+
+
+def _non_empty_file(path: Path) -> bool:
+    return path.exists() and path.is_file() and path.stat().st_size > 0
+
+
 def _create_run_root(output_dir: str | Path, run_id: str | None) -> Path:
     root = Path(output_dir)
     resolved_run_id = run_id or f"ablation_{datetime.now(UTC):%Y%m%d_%H%M%S}"
@@ -640,6 +740,13 @@ def _write_status(path: Path, rows: list[dict[str, object]]) -> None:
     extra_columns = sorted(set(frame.columns) - set(STATUS_COLUMNS))
     columns = [*STATUS_COLUMNS, *extra_columns]
     frame.reindex(columns=columns).to_csv(path, index=False)
+
+
+def _load_status_rows(path: Path) -> list[dict[str, object]]:
+    if not path.exists() or path.stat().st_size == 0:
+        return []
+    frame = pd.read_csv(path)
+    return frame.where(pd.notna(frame), "").to_dict("records")
 
 
 def _value_counts(frame: pd.DataFrame, column: str) -> dict[str, int]:
