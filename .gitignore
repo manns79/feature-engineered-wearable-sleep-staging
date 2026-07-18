@@ -14,6 +14,7 @@ data/processed/*
 outputs/figures/*
 outputs/metrics/*
 outputs/models/*
+outputs/runs/
 
 # Keep directory structure and the fixed split assignment visible in git.
 !data/raw/.gitkeep
