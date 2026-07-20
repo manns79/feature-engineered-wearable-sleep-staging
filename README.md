@@ -154,6 +154,32 @@ hyperparameters by macro F1, refits the best model from each family on the full
 training split, and writes validation-only metrics and predictions. The test
 feature table is intentionally not loaded during this milestone.
 
+To run manifest-driven ablation experiments over the rich feature families and
+signal groups:
+
+```bash
+python scripts/run_ablation_experiments.py --run-id full_ablation_YYYYMMDD
+```
+
+After the ablation run completes, run validation-only error analysis for the
+strongest non-dummy model families within each ablation:
+
+```bash
+python scripts/run_validation_error_analysis.py \
+  --run-dir outputs/runs/full_ablation_YYYYMMDD
+```
+
+This writes metrics and figures under
+`outputs/runs/full_ablation_YYYYMMDD/error_analysis/`. The default analysis
+selects elastic-net logistic regression, random forest, and XGBoost for every
+completed ablation, then produces confusion matrices, per-class metrics,
+per-participant metrics, transition-distance metrics, model-family comparisons,
+native feature importance, validation permutation importance, and optional
+XGBoost SHAP summary plots when `shap` is installed. Use
+`notebooks/03_validation_error_analysis.ipynb` to review the figures side by
+side. This step must use `data/processed/features_val.csv`; do not point it at
+the held-out test feature table.
+
 If your DREAMT CSVs are not sampled at 64 Hz, pass the correct sampling rate or
 explicit rows per 30-second epoch:
 
