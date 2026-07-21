@@ -6,10 +6,11 @@ import pytest
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 from src.models.error_analysis import (
     add_transition_context,
     load_validation_features,
+    permutation_importance_frame,
     run_validation_error_analysis,
     select_validation_model_runs,
 )
@@ -236,3 +237,49 @@ def test_run_validation_error_analysis_writes_validation_only_outputs(tmp_path):
     assert pd.read_csv(outputs.predictions_path)["split"].unique().tolist() == [
         "validation"
     ]
+
+
+def test_permutation_importance_supports_encoded_label_model_artifacts(tmp_path):
+    features = pd.DataFrame(
+        {
+            "participant_id": ["S001", "S001", "S001", "S002", "S002", "S002"],
+            "epoch_id": [0, 1, 2, 0, 1, 2],
+            "split": ["validation"] * 6,
+            "label": ["Wake", "Non-REM", "REM", "Wake", "Non-REM", "REM"],
+            "BVP_mean": [0.0, 1.0, 2.0, 0.1, 1.1, 2.1],
+            "HR_mean": [70.0, 60.0, 75.0, 71.0, 61.0, 76.0],
+        }
+    )
+    encoder = LabelEncoder()
+    encoded_labels = encoder.fit_transform(features["label"])
+    estimator = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            (
+                "classifier",
+                LogisticRegression(max_iter=1000),
+            ),
+        ]
+    )
+    estimator.fit(features[["BVP_mean", "HR_mean"]], encoded_labels)
+    model_path = tmp_path / "encoded_model.joblib"
+    joblib.dump({"estimator": estimator, "label_encoder": encoder}, model_path)
+    selected_models = pd.DataFrame(
+        [
+            {
+                "ablation": "basic_statistical",
+                "model": "xgboost",
+                "model_path": str(model_path),
+                "selected_features": "BVP_mean|HR_mean",
+            }
+        ]
+    )
+
+    importance = permutation_importance_frame(
+        selected_models=selected_models,
+        validation_features=features,
+        n_repeats=1,
+        random_state=42,
+    )
+
+    assert set(importance["feature"]) == {"BVP_mean", "HR_mean"}

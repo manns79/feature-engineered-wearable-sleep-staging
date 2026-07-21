@@ -11,6 +11,7 @@ from typing import Any
 import joblib
 import numpy as np
 import pandas as pd
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.inspection import permutation_importance
 from sklearn.metrics import precision_recall_fscore_support
 
@@ -946,13 +947,17 @@ def _xgboost_estimator(fitted: Any) -> Any:
     return fitted
 
 
-class _EncodedLabelEstimator:
+class _EncodedLabelEstimator(ClassifierMixin, BaseEstimator):
     """Adapter exposing decoded labels for encoded XGBoost validation scoring."""
 
     def __init__(self, estimator: Any, label_encoder: Any) -> None:
         self.estimator = estimator
         self.label_encoder = label_encoder
         self.classes_ = label_encoder.classes_
+
+    def fit(self, X: pd.DataFrame, y: pd.Series | np.ndarray | None = None) -> Any:
+        """Satisfy sklearn's estimator protocol for permutation scoring."""
+        return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         encoded = self.estimator.predict(X)
