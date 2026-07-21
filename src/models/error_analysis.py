@@ -337,7 +337,18 @@ def load_epoch_index_if_present(path: str | Path | None) -> pd.DataFrame | None:
     epoch_path = Path(path)
     if not epoch_path.exists():
         return None
-    return pd.read_csv(epoch_path, dtype={"participant_id": str})
+    return pd.read_csv(
+        epoch_path,
+        dtype={
+            "participant_id": str,
+            "split": str,
+            "raw_label": "string",
+            "mapped_label": "string",
+            "exclusion_reason": "string",
+            "segmentation_reason": "string",
+        },
+        low_memory=False,
+    )
 
 
 def load_selected_predictions(selected_models: pd.DataFrame) -> pd.DataFrame:
