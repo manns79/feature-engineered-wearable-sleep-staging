@@ -21,8 +21,12 @@ def save_confusion_matrix_plot(
 
     output = Path(path)
     output.parent.mkdir(parents=True, exist_ok=True)
+    display_matrix = matrix.rename(
+        index=lambda label: str(label).removeprefix("true_"),
+        columns=lambda label: str(label).removeprefix("pred_"),
+    )
     fig, ax = plt.subplots(figsize=(5, 4))
-    sns.heatmap(matrix, annot=True, fmt=fmt, cmap=cmap, cbar=False, ax=ax)
+    sns.heatmap(display_matrix, annot=True, fmt=fmt, cmap=cmap, cbar=False, ax=ax)
     ax.set_xlabel("Predicted label")
     ax.set_ylabel("True label")
     fig.tight_layout()

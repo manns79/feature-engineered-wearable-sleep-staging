@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import joblib
 import pandas as pd
@@ -228,7 +229,7 @@ def test_run_validation_error_analysis_writes_validation_only_outputs(tmp_path):
         models=("elastic_net_logistic_regression",),
         compute_permutation=False,
         compute_shap=False,
-        create_plots=False,
+        create_plots=True,
     )
 
     assert outputs.selected_models_path.exists()
@@ -237,6 +238,19 @@ def test_run_validation_error_analysis_writes_validation_only_outputs(tmp_path):
     assert pd.read_csv(outputs.predictions_path)["split"].unique().tolist() == [
         "validation"
     ]
+    artifact_names = {path.name for path in outputs.artifact_index["path"].map(Path)}
+    assert (
+        "basic_statistical_elastic_net_logistic_regression_confusion_counts.png"
+        not in artifact_names
+    )
+    assert (
+        "basic_statistical_elastic_net_logistic_regression_confusion_true_normalized.png"
+        in artifact_names
+    )
+    assert (
+        "basic_statistical_elastic_net_logistic_regression_feature_importance.png"
+        not in artifact_names
+    )
 
 
 def test_permutation_importance_supports_encoded_label_model_artifacts(tmp_path):

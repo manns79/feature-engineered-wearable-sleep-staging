@@ -172,7 +172,6 @@ def run_validation_error_analysis(
                 per_participant_metrics=per_participant_metrics,
                 transition_metrics=transition_metrics,
                 model_family_comparison=model_family_comparison,
-                feature_importance=feature_importance,
                 permutation_importance=permutation_frame,
                 validation_features=validation_features,
                 figures_dir=figures_dir,
@@ -691,7 +690,6 @@ def create_error_analysis_plots(
     per_participant_metrics: pd.DataFrame,
     transition_metrics: pd.DataFrame,
     model_family_comparison: pd.DataFrame,
-    feature_importance: pd.DataFrame,
     permutation_importance: pd.DataFrame,
     validation_features: pd.DataFrame,
     figures_dir: Path,
@@ -719,10 +717,6 @@ def create_error_analysis_plots(
         confusion = confusion_matrix_frame(
             subset["true_label"], subset["pred_label"], labels=TARGET_LABELS
         )
-        confusion_path = figures_dir / f"{stem}_confusion_counts.png"
-        save_confusion_matrix_plot(confusion, confusion_path)
-        rows.append(_artifact_row(confusion_path, "figure", row.ablation, row.model))
-
         normalized_confusion = confusion.div(confusion.sum(axis=1), axis=0).fillna(0.0)
         normalized_path = figures_dir / f"{stem}_confusion_true_normalized.png"
         save_confusion_matrix_plot(
@@ -764,22 +758,6 @@ def create_error_analysis_plots(
             metric="macro_f1",
         )
         rows.append(_artifact_row(transition_path, "figure", row.ablation, row.model))
-
-        importance_subset = feature_importance[
-            (feature_importance["ablation"] == row.ablation)
-            & (feature_importance["model"] == row.model)
-        ]
-        if not importance_subset.empty:
-            importance_path = figures_dir / f"{stem}_feature_importance.png"
-            save_feature_importance_plot(
-                importance_subset,
-                importance_path,
-                value_column="abs_importance",
-                title="Native feature importance",
-            )
-            rows.append(
-                _artifact_row(importance_path, "figure", row.ablation, row.model)
-            )
 
         permutation_subset = permutation_importance[
             (permutation_importance.get("ablation") == row.ablation)
