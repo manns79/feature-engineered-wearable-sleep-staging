@@ -55,22 +55,26 @@ class RollingLogisticExperimentOutputs:
     best_params_path: Path
     metrics_path: Path
     raw_predictions_path: Path
+    raw_threshold_predictions_path: Path
     calibrated_predictions_path: Path
     decoded_predictions_path: Path
     threshold_predictions_path: Path
     smoothed_predictions_path: Path
     smoothed_threshold_predictions_path: Path
     raw_confusion_path: Path
+    raw_threshold_confusion_path: Path
     calibrated_confusion_path: Path
     decoded_confusion_path: Path
     threshold_confusion_path: Path
     smoothed_confusion_path: Path
     smoothed_threshold_confusion_path: Path
     threshold_tuning_path: Path
+    raw_threshold_tuning_path: Path
     smoothing_tuning_path: Path
     smoothed_threshold_tuning_path: Path
     model_path: Path
     calibrator_path: Path
+    raw_threshold_rule_path: Path
     threshold_rule_path: Path
     smoothed_threshold_rule_path: Path
     transition_model_path: Path
@@ -161,6 +165,23 @@ def run_rolling_logistic_experiment(
     raw_predictions_path = metrics_dir / "validation_raw_predictions.csv"
     raw_predictions.to_csv(raw_predictions_path, index=False)
 
+    raw_threshold_tuning = tune_class_thresholds(
+        raw_probabilities,
+        validation_features["label"],
+        threshold_grid=threshold_grid,
+    )
+    raw_threshold_tuning_path = metrics_dir / "raw_threshold_tuning_results.csv"
+    raw_threshold_tuning.results.to_csv(raw_threshold_tuning_path, index=False)
+    raw_threshold_rule_path = models_dir / "raw_threshold_rule.joblib"
+    joblib.dump(raw_threshold_tuning.rule, raw_threshold_rule_path)
+    raw_threshold_predictions = threshold_prediction_frame(
+        validation_features, raw_probabilities, raw_threshold_tuning.rule
+    )
+    raw_threshold_predictions_path = (
+        metrics_dir / "validation_raw_threshold_predictions.csv"
+    )
+    raw_threshold_predictions.to_csv(raw_threshold_predictions_path, index=False)
+
     calibrator = OneVsRestPlattCalibrator(classes=TARGET_LABELS).fit(
         raw_probabilities, validation_features["label"]
     )
@@ -249,6 +270,9 @@ def run_rolling_logistic_experiment(
 
     metrics_path = metrics_dir / "validation_metrics.csv"
     raw_confusion_path = metrics_dir / "validation_raw_confusion.csv"
+    raw_threshold_confusion_path = (
+        metrics_dir / "validation_raw_threshold_confusion.csv"
+    )
     calibrated_confusion_path = metrics_dir / "validation_calibrated_confusion.csv"
     decoded_confusion_path = metrics_dir / "validation_calibrated_viterbi_confusion.csv"
     threshold_confusion_path = (
@@ -263,6 +287,11 @@ def run_rolling_logistic_experiment(
     _write_comparison_metrics(
         [
             ("logistic_raw", raw_predictions, raw_confusion_path),
+            (
+                "logistic_threshold_tuned",
+                raw_threshold_predictions,
+                raw_threshold_confusion_path,
+            ),
             ("logistic_platt", calibrated_predictions, calibrated_confusion_path),
             ("logistic_platt_viterbi", decoded_predictions, decoded_confusion_path),
             (
@@ -318,22 +347,26 @@ def run_rolling_logistic_experiment(
         best_params_path=best_params_path,
         metrics_path=metrics_path,
         raw_predictions_path=raw_predictions_path,
+        raw_threshold_predictions_path=raw_threshold_predictions_path,
         calibrated_predictions_path=calibrated_predictions_path,
         decoded_predictions_path=decoded_predictions_path,
         threshold_predictions_path=threshold_predictions_path,
         smoothed_predictions_path=smoothed_predictions_path,
         smoothed_threshold_predictions_path=smoothed_threshold_predictions_path,
         raw_confusion_path=raw_confusion_path,
+        raw_threshold_confusion_path=raw_threshold_confusion_path,
         calibrated_confusion_path=calibrated_confusion_path,
         decoded_confusion_path=decoded_confusion_path,
         threshold_confusion_path=threshold_confusion_path,
         smoothed_confusion_path=smoothed_confusion_path,
         smoothed_threshold_confusion_path=smoothed_threshold_confusion_path,
         threshold_tuning_path=threshold_tuning_path,
+        raw_threshold_tuning_path=raw_threshold_tuning_path,
         smoothing_tuning_path=smoothing_tuning_path,
         smoothed_threshold_tuning_path=smoothed_threshold_tuning_path,
         model_path=model_path,
         calibrator_path=calibrator_path,
+        raw_threshold_rule_path=raw_threshold_rule_path,
         threshold_rule_path=threshold_rule_path,
         smoothed_threshold_rule_path=smoothed_threshold_rule_path,
         transition_model_path=transition_model_path,

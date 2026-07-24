@@ -78,12 +78,14 @@ def test_rolling_logistic_experiment_writes_validation_only_outputs(tmp_path):
     assert outputs.run_dir == tmp_path / "outputs" / "runs" / "rolling_test"
     assert set(metrics["model"]) == {
         "logistic_raw",
+        "logistic_threshold_tuned",
         "logistic_platt",
         "logistic_platt_viterbi",
         "logistic_platt_threshold_tuned",
         "logistic_platt_smoothed",
         "logistic_platt_smoothed_threshold_tuned",
     }
+    assert outputs.raw_threshold_tuning_path.exists()
     assert outputs.threshold_tuning_path.exists()
     assert outputs.smoothing_tuning_path.exists()
     assert outputs.smoothed_threshold_tuning_path.exists()
@@ -125,6 +127,7 @@ def test_locked_test_evaluation_is_separate_from_validation_experiment(tmp_path)
     assert set(metrics["split"]) == {"test"}
     assert set(metrics["model"]) == {
         "logistic_raw",
+        "logistic_threshold_tuned",
         "logistic_platt",
         "logistic_platt_viterbi",
         "logistic_platt_threshold_tuned",

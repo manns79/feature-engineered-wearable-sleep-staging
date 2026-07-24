@@ -94,6 +94,7 @@ def _rolling_logistic_test_predictions(
     ].tolist()
     fitted = joblib.load(models_dir / "rolling_logistic_model.joblib")
     calibrator = joblib.load(models_dir / "platt_calibrator.joblib")
+    raw_threshold_rule = joblib.load(models_dir / "raw_threshold_rule.joblib")
     threshold_rule = joblib.load(models_dir / "threshold_rule.joblib")
     smoothed_threshold_rule = joblib.load(models_dir / "smoothed_threshold_rule.joblib")
     transition_model = joblib.load(models_dir / "transition_model.joblib")
@@ -105,6 +106,12 @@ def _rolling_logistic_test_predictions(
     raw = probability_frame(test_features, raw_probabilities)
     raw.insert(0, "model", "logistic_raw")
     raw.insert(0, "ablation", "rolling_context_corr_pruned")
+
+    raw_threshold = threshold_prediction_frame(
+        test_features, raw_probabilities, raw_threshold_rule
+    )
+    raw_threshold.insert(0, "model", "logistic_threshold_tuned")
+    raw_threshold.insert(0, "ablation", "rolling_context_corr_pruned")
 
     calibrated_probabilities = calibrator.predict_proba(raw_probabilities)
     calibrated = probability_frame(test_features, calibrated_probabilities)
@@ -135,7 +142,15 @@ def _rolling_logistic_test_predictions(
     decoded = apply_viterbi_by_participant(calibrated, transition_model)
     decoded["model"] = "logistic_platt_viterbi"
     decoded["ablation"] = "rolling_context_corr_pruned"
-    return [raw, calibrated, decoded, threshold, smoothed, smoothed_threshold]
+    return [
+        raw,
+        raw_threshold,
+        calibrated,
+        decoded,
+        threshold,
+        smoothed,
+        smoothed_threshold,
+    ]
 
 
 def _prior_ablation_test_predictions(
