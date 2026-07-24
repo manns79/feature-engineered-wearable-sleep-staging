@@ -5,10 +5,12 @@ from src.models.calibration import (
     OneVsRestPlattCalibrator,
     align_probabilities,
     predicted_labels,
+    tune_class_thresholds,
 )
 from src.models.sequence_postprocessing import (
     apply_viterbi_by_participant,
     estimate_transition_model,
+    smooth_probabilities_by_participant,
     viterbi_decode,
 )
 
@@ -41,6 +43,55 @@ def test_platt_calibrator_outputs_normalized_probabilities():
     assert calibrated.shape == probabilities.shape
     assert np.allclose(calibrated.sum(axis=1), 1.0)
     assert predicted_labels(calibrated) == labels
+
+
+def test_threshold_tuning_can_recover_macro_f1_focused_decision_rule():
+    probabilities = np.array(
+        [
+            [0.6, 0.3, 0.1],
+            [0.6, 0.2, 0.2],
+            [0.2, 0.6, 0.2],
+            [0.2, 0.6, 0.2],
+            [0.4, 0.2, 0.4],
+            [0.4, 0.2, 0.4],
+        ]
+    )
+    labels = ["Wake", "Wake", "Non-REM", "Non-REM", "REM", "REM"]
+
+    result = tune_class_thresholds(
+        probabilities, labels, threshold_grid=(0.2, 0.5, 0.8)
+    )
+
+    assert result.rule.predict(probabilities) == labels
+    assert result.results.iloc[0]["macro_f1"] == 1.0
+    assert {"threshold_Wake", "threshold_Non_REM", "threshold_REM"}.issubset(
+        result.results.columns
+    )
+
+
+def test_probability_smoothing_stays_inside_participant_boundaries():
+    frame = pd.DataFrame(
+        {
+            "participant_id": ["S001", "S001", "S002"],
+            "epoch_id": [0, 1, 0],
+            "split": ["validation"] * 3,
+            "label": ["Wake", "Non-REM", "REM"],
+        }
+    )
+    probabilities = np.array(
+        [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ]
+    )
+
+    smoothed = smooth_probabilities_by_participant(
+        frame, probabilities, window_epochs=3
+    )
+
+    assert smoothed[2].tolist() == [0.0, 0.0, 1.0]
+    assert np.allclose(smoothed.sum(axis=1), 1.0)
 
 
 def test_transition_model_and_viterbi_decode_by_participant():

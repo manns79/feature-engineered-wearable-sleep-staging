@@ -69,6 +69,8 @@ def test_rolling_logistic_experiment_writes_validation_only_outputs(tmp_path):
             "classifier__C": [1.0],
             "classifier__l1_ratio": [0.5],
         },
+        threshold_grid=(0.2, 0.5, 0.8),
+        smoothing_windows=(3,),
     )
 
     metrics = pd.read_csv(outputs.metrics_path)
@@ -78,7 +80,13 @@ def test_rolling_logistic_experiment_writes_validation_only_outputs(tmp_path):
         "logistic_raw",
         "logistic_platt",
         "logistic_platt_viterbi",
+        "logistic_platt_threshold_tuned",
+        "logistic_platt_smoothed",
+        "logistic_platt_smoothed_threshold_tuned",
     }
+    assert outputs.threshold_tuning_path.exists()
+    assert outputs.smoothing_tuning_path.exists()
+    assert outputs.smoothed_threshold_tuning_path.exists()
     assert "HR_mean_roll9_mean" in selected["feature"].tolist()
     assert "HR_mean_roll3_mean" not in selected["feature"].tolist()
     assert not (tmp_path / "features_test.csv").exists()
@@ -104,6 +112,8 @@ def test_locked_test_evaluation_is_separate_from_validation_experiment(tmp_path)
             "classifier__C": [1.0],
             "classifier__l1_ratio": [0.5],
         },
+        threshold_grid=(0.2, 0.5, 0.8),
+        smoothing_windows=(3,),
     )
 
     outputs = run_locked_test_evaluation(
@@ -117,4 +127,7 @@ def test_locked_test_evaluation_is_separate_from_validation_experiment(tmp_path)
         "logistic_raw",
         "logistic_platt",
         "logistic_platt_viterbi",
+        "logistic_platt_threshold_tuned",
+        "logistic_platt_smoothed",
+        "logistic_platt_smoothed_threshold_tuned",
     }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -11,9 +12,16 @@ import pandas as pd
 
 from src.config import TARGET_LABELS
 from src.features.build_features import FEATURE_ID_COLUMNS
-from src.models.calibration import align_probabilities, probability_frame
+from src.models.calibration import (
+    align_probabilities,
+    probability_frame,
+    threshold_prediction_frame,
+)
 from src.models.evaluate import classification_metrics, confusion_matrix_frame
-from src.models.sequence_postprocessing import apply_viterbi_by_participant
+from src.models.sequence_postprocessing import (
+    apply_viterbi_by_participant,
+    smooth_probabilities_by_participant,
+)
 
 DEFAULT_PRIOR_MODELS = (
     "elastic_net_logistic_regression",
@@ -86,7 +94,10 @@ def _rolling_logistic_test_predictions(
     ].tolist()
     fitted = joblib.load(models_dir / "rolling_logistic_model.joblib")
     calibrator = joblib.load(models_dir / "platt_calibrator.joblib")
+    threshold_rule = joblib.load(models_dir / "threshold_rule.joblib")
+    smoothed_threshold_rule = joblib.load(models_dir / "smoothed_threshold_rule.joblib")
     transition_model = joblib.load(models_dir / "transition_model.joblib")
+    run_config = json.loads((rolling_root / "run_config.json").read_text())
 
     raw_probabilities = _predict_aligned_probabilities(
         fitted, test_features[selected_features]
@@ -100,10 +111,31 @@ def _rolling_logistic_test_predictions(
     calibrated.insert(0, "model", "logistic_platt")
     calibrated.insert(0, "ablation", "rolling_context_corr_pruned")
 
+    threshold = threshold_prediction_frame(
+        test_features, calibrated_probabilities, threshold_rule
+    )
+    threshold.insert(0, "model", "logistic_platt_threshold_tuned")
+    threshold.insert(0, "ablation", "rolling_context_corr_pruned")
+
+    smoothed_probabilities = smooth_probabilities_by_participant(
+        test_features,
+        calibrated_probabilities,
+        window_epochs=int(run_config["selected_smoothing_window"]),
+    )
+    smoothed = probability_frame(test_features, smoothed_probabilities)
+    smoothed.insert(0, "model", "logistic_platt_smoothed")
+    smoothed.insert(0, "ablation", "rolling_context_corr_pruned")
+
+    smoothed_threshold = threshold_prediction_frame(
+        test_features, smoothed_probabilities, smoothed_threshold_rule
+    )
+    smoothed_threshold.insert(0, "model", "logistic_platt_smoothed_threshold_tuned")
+    smoothed_threshold.insert(0, "ablation", "rolling_context_corr_pruned")
+
     decoded = apply_viterbi_by_participant(calibrated, transition_model)
     decoded["model"] = "logistic_platt_viterbi"
     decoded["ablation"] = "rolling_context_corr_pruned"
-    return [raw, calibrated, decoded]
+    return [raw, calibrated, decoded, threshold, smoothed, smoothed_threshold]
 
 
 def _prior_ablation_test_predictions(

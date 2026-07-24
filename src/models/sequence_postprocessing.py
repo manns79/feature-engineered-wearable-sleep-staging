@@ -7,9 +7,12 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from sklearn.metrics import f1_score
 
 from src.config import TARGET_LABELS
-from src.models.calibration import probability_columns
+from src.models.calibration import probability_columns, probability_frame
+
+DEFAULT_SMOOTHING_WINDOWS = (3, 5, 9, 15)
 
 
 @dataclass(frozen=True)
@@ -19,6 +22,15 @@ class TransitionModel:
     classes: tuple[str, ...]
     initial_probabilities: np.ndarray
     transition_matrix: np.ndarray
+
+
+@dataclass(frozen=True)
+class SmoothingSelectionResult:
+    """Best smoothing window and validation tuning trace."""
+
+    window_epochs: int
+    macro_f1: float
+    results: pd.DataFrame
 
 
 def estimate_transition_model(
@@ -56,6 +68,94 @@ def estimate_transition_model(
         classes=classes,
         initial_probabilities=initial_probabilities,
         transition_matrix=transition_matrix,
+    )
+
+
+def smooth_probabilities_by_participant(
+    frame: pd.DataFrame,
+    probabilities: Any,
+    *,
+    window_epochs: int,
+    classes: tuple[str, ...] = TARGET_LABELS,
+    center: bool = True,
+) -> np.ndarray:
+    """Smooth probabilities within each participant using a rolling mean."""
+    if window_epochs < 1:
+        raise ValueError("window_epochs must be at least 1.")
+    required = {"participant_id", "epoch_id"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise ValueError(f"frame is missing column(s): {missing}")
+
+    columns = probability_columns(classes)
+    probs = np.asarray(probabilities, dtype=float)
+    if probs.ndim != 2 or probs.shape[1] != len(classes):
+        raise ValueError("probabilities must have one column per class.")
+    working = frame[["participant_id", "epoch_id"]].copy()
+    for index, column in enumerate(columns):
+        working[column] = probs[:, index]
+    working["_original_order"] = np.arange(len(working))
+    working = working.sort_values(["participant_id", "epoch_id"])
+    smoothed_parts: list[pd.DataFrame] = []
+    for _, participant in working.groupby("participant_id", sort=False):
+        smoothed = participant[columns].rolling(
+            window=window_epochs,
+            min_periods=1,
+            center=center,
+        ).mean()
+        smoothed["_original_order"] = participant["_original_order"].to_numpy()
+        smoothed_parts.append(smoothed)
+    output = pd.concat(smoothed_parts, ignore_index=True)
+    output = output.sort_values("_original_order")
+    smoothed_array = output[columns].to_numpy(dtype=float)
+    row_sums = smoothed_array.sum(axis=1, keepdims=True)
+    zero_rows = row_sums[:, 0] == 0
+    if zero_rows.any():
+        smoothed_array[zero_rows, :] = 1.0 / len(classes)
+        row_sums = smoothed_array.sum(axis=1, keepdims=True)
+    return smoothed_array / row_sums
+
+
+def tune_smoothing_window(
+    frame: pd.DataFrame,
+    probabilities: Any,
+    labels: Any,
+    *,
+    windows: tuple[int, ...] = DEFAULT_SMOOTHING_WINDOWS,
+    classes: tuple[str, ...] = TARGET_LABELS,
+) -> SmoothingSelectionResult:
+    """Select the smoothing window that maximizes validation macro F1."""
+    if not windows:
+        raise ValueError("windows must contain at least one value.")
+    rows: list[dict[str, float | int]] = []
+    best_window: int | None = None
+    best_score = -1.0
+    labels_array = np.asarray(labels)
+    for window in windows:
+        smoothed = smooth_probabilities_by_participant(
+            frame, probabilities, window_epochs=window, classes=classes
+        )
+        predictions = probability_frame(frame, smoothed, classes=classes)["pred_label"]
+        macro_f1 = float(
+            f1_score(
+                labels_array,
+                predictions,
+                labels=classes,
+                average="macro",
+                zero_division=0,
+            )
+        )
+        rows.append({"window_epochs": window, "macro_f1": macro_f1})
+        if macro_f1 > best_score:
+            best_score = macro_f1
+            best_window = window
+    if best_window is None:
+        raise ValueError("No smoothing windows were evaluated.")
+    results = pd.DataFrame(rows).sort_values("macro_f1", ascending=False)
+    return SmoothingSelectionResult(
+        window_epochs=best_window,
+        macro_f1=best_score,
+        results=results.reset_index(drop=True),
     )
 
 

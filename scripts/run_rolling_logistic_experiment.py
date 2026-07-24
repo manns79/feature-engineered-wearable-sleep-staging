@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 
+from src.models.calibration import DEFAULT_THRESHOLD_GRID
 from src.models.feature_selection import DEFAULT_CORRELATION_THRESHOLD
 from src.models.rolling_logistic_experiment import run_rolling_logistic_experiment
+from src.models.sequence_postprocessing import DEFAULT_SMOOTHING_WINDOWS
 
 
 def parse_args() -> argparse.Namespace:
@@ -24,6 +26,20 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--cv-splits", type=int, default=5)
     parser.add_argument("--n-jobs", type=int, default=None)
     parser.add_argument("--verbose-search", type=int, default=0)
+    parser.add_argument(
+        "--threshold-grid",
+        type=float,
+        nargs="+",
+        default=DEFAULT_THRESHOLD_GRID,
+        help="Class threshold values considered during validation tuning.",
+    )
+    parser.add_argument(
+        "--smoothing-window",
+        type=int,
+        nargs="+",
+        default=DEFAULT_SMOOTHING_WINDOWS,
+        help="Participant-contained probability smoothing windows to compare.",
+    )
     return parser.parse_args()
 
 
@@ -40,6 +56,8 @@ def main() -> None:
         cv_splits=args.cv_splits,
         n_jobs=args.n_jobs,
         verbose_search=args.verbose_search,
+        threshold_grid=tuple(args.threshold_grid),
+        smoothing_windows=tuple(args.smoothing_window),
     )
     print(f"Wrote run artifacts under {outputs.run_dir}")
     print(f"Wrote selected features to {outputs.selected_features_path}")

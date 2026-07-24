@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
+from itertools import product
 from typing import Any
 
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score
 
 from src.config import TARGET_LABELS
+
+DEFAULT_THRESHOLD_GRID = (0.05, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70)
+DEFAULT_THRESHOLD_GRID = (*DEFAULT_THRESHOLD_GRID, 0.80, 0.90)
 
 
 @dataclass
@@ -57,6 +63,88 @@ class OneVsRestPlattCalibrator:
         return calibrated / row_sums
 
 
+@dataclass(frozen=True)
+class ClassThresholdRule:
+    """Class-specific thresholds used as a multiclass decision rule."""
+
+    classes: tuple[str, ...]
+    thresholds: tuple[float, ...]
+    macro_f1: float
+
+    def predict(self, probabilities: Any) -> list[str]:
+        """Predict labels from probabilities divided by class thresholds."""
+        probs = _as_probability_array(probabilities, self.classes)
+        thresholds = np.asarray(self.thresholds, dtype=float)
+        if np.any(thresholds <= 0):
+            raise ValueError("thresholds must all be greater than 0.")
+        adjusted = probs / thresholds[np.newaxis, :]
+        return [self.classes[index] for index in adjusted.argmax(axis=1)]
+
+    def metadata(self) -> dict[str, float | str]:
+        """Return a flat metadata row for CSV output."""
+        row: dict[str, float | str] = {"macro_f1": self.macro_f1}
+        for label, threshold in zip(self.classes, self.thresholds, strict=True):
+            row[f"threshold_{_safe_label(label)}"] = threshold
+        return row
+
+
+@dataclass(frozen=True)
+class ThresholdTuningResult:
+    """Best threshold rule and full validation tuning trace."""
+
+    rule: ClassThresholdRule
+    results: pd.DataFrame
+
+
+def tune_class_thresholds(
+    probabilities: Any,
+    labels: Any,
+    *,
+    classes: tuple[str, ...] = TARGET_LABELS,
+    threshold_grid: Sequence[float] = DEFAULT_THRESHOLD_GRID,
+) -> ThresholdTuningResult:
+    """Tune class-specific thresholds to maximize validation macro F1."""
+    probs = _as_probability_array(probabilities, classes)
+    labels_array = np.asarray(labels)
+    grid = tuple(float(value) for value in threshold_grid)
+    if not grid:
+        raise ValueError("threshold_grid must contain at least one value.")
+    if any(value <= 0 for value in grid):
+        raise ValueError("threshold_grid values must all be greater than 0.")
+
+    rows: list[dict[str, float]] = []
+    best_rule: ClassThresholdRule | None = None
+    for thresholds in product(grid, repeat=len(classes)):
+        rule = ClassThresholdRule(classes=classes, thresholds=thresholds, macro_f1=0.0)
+        predictions = rule.predict(probs)
+        macro_f1 = float(
+            f1_score(
+                labels_array,
+                predictions,
+                labels=classes,
+                average="macro",
+                zero_division=0,
+            )
+        )
+        row = {
+            f"threshold_{_safe_label(label)}": threshold
+            for label, threshold in zip(classes, thresholds, strict=True)
+        }
+        row["macro_f1"] = macro_f1
+        rows.append(row)
+        if best_rule is None or macro_f1 > best_rule.macro_f1:
+            best_rule = ClassThresholdRule(
+                classes=classes,
+                thresholds=thresholds,
+                macro_f1=macro_f1,
+            )
+
+    if best_rule is None:
+        raise ValueError("No threshold combinations were evaluated.")
+    results = pd.DataFrame(rows).sort_values("macro_f1", ascending=False)
+    return ThresholdTuningResult(rule=best_rule, results=results.reset_index(drop=True))
+
+
 def predicted_labels(
     probabilities: Any, classes: tuple[str, ...] = TARGET_LABELS
 ) -> list[str]:
@@ -99,6 +187,17 @@ def probability_frame(
     output[pred_column] = predicted_labels(probs, classes)
     for index, label in enumerate(classes):
         output[f"prob_{_safe_label(label)}"] = probs[:, index]
+    return output
+
+
+def threshold_prediction_frame(
+    base_frame: pd.DataFrame,
+    probabilities: Any,
+    rule: ClassThresholdRule,
+) -> pd.DataFrame:
+    """Build a probability frame whose predictions use a threshold rule."""
+    output = probability_frame(base_frame, probabilities, classes=rule.classes)
+    output["pred_label"] = rule.predict(probabilities)
     return output
 
 
