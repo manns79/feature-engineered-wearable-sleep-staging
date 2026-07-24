@@ -1,3 +1,5 @@
+import json
+
 import pandas as pd
 from src.models.locked_test_evaluation import run_locked_test_evaluation
 from src.models.rolling_logistic_experiment import run_rolling_logistic_experiment
@@ -75,6 +77,8 @@ def test_rolling_logistic_experiment_writes_validation_only_outputs(tmp_path):
 
     metrics = pd.read_csv(outputs.metrics_path)
     selected = pd.read_csv(outputs.selected_features_path)
+    train_oof = pd.read_csv(outputs.train_oof_predictions_path)
+    run_config = json.loads(outputs.config_path.read_text())
     assert outputs.run_dir == tmp_path / "outputs" / "runs" / "rolling_test"
     assert set(metrics["model"]) == {
         "logistic_raw",
@@ -89,6 +93,8 @@ def test_rolling_logistic_experiment_writes_validation_only_outputs(tmp_path):
     assert outputs.threshold_tuning_path.exists()
     assert outputs.smoothing_tuning_path.exists()
     assert outputs.smoothed_threshold_tuning_path.exists()
+    assert set(train_oof["split"]) == {"train"}
+    assert run_config["postprocessing_tuning_source"] == "train_out_of_fold"
     assert "HR_mean_roll9_mean" in selected["feature"].tolist()
     assert "HR_mean_roll3_mean" not in selected["feature"].tolist()
     assert not (tmp_path / "features_test.csv").exists()

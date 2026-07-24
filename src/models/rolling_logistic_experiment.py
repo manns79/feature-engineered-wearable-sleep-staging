@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+import numpy as np
 import pandas as pd
 from sklearn.base import clone
 from sklearn.model_selection import GridSearchCV
@@ -53,6 +54,7 @@ class RollingLogisticExperimentOutputs:
     correlation_edges_path: Path
     cv_results_path: Path
     best_params_path: Path
+    train_oof_predictions_path: Path
     metrics_path: Path
     raw_predictions_path: Path
     raw_threshold_predictions_path: Path
@@ -156,6 +158,17 @@ def run_rolling_logistic_experiment(
         ]
     ).to_csv(best_params_path, index=False)
 
+    oof_raw_probabilities = _out_of_fold_raw_probabilities(
+        train_features,
+        selected_features,
+        best_params,
+        random_state=random_state,
+        cv_splits=cv_splits,
+    )
+    train_oof_predictions = probability_frame(train_features, oof_raw_probabilities)
+    train_oof_predictions_path = metrics_dir / "train_oof_raw_predictions.csv"
+    train_oof_predictions.to_csv(train_oof_predictions_path, index=False)
+
     raw_probabilities = align_probabilities(
         fitted.predict_proba(validation_features[selected_features]),
         fitted.classes_,
@@ -166,11 +179,13 @@ def run_rolling_logistic_experiment(
     raw_predictions.to_csv(raw_predictions_path, index=False)
 
     raw_threshold_tuning = tune_class_thresholds(
-        raw_probabilities,
-        validation_features["label"],
+        oof_raw_probabilities,
+        train_features["label"],
         threshold_grid=threshold_grid,
     )
-    raw_threshold_tuning_path = metrics_dir / "raw_threshold_tuning_results.csv"
+    raw_threshold_tuning_path = (
+        metrics_dir / "train_oof_raw_threshold_tuning_results.csv"
+    )
     raw_threshold_tuning.results.to_csv(raw_threshold_tuning_path, index=False)
     raw_threshold_rule_path = models_dir / "raw_threshold_rule.joblib"
     joblib.dump(raw_threshold_tuning.rule, raw_threshold_rule_path)
@@ -183,10 +198,11 @@ def run_rolling_logistic_experiment(
     raw_threshold_predictions.to_csv(raw_threshold_predictions_path, index=False)
 
     calibrator = OneVsRestPlattCalibrator(classes=TARGET_LABELS).fit(
-        raw_probabilities, validation_features["label"]
+        oof_raw_probabilities, train_features["label"]
     )
     calibrator_path = models_dir / "platt_calibrator.joblib"
     joblib.dump(calibrator, calibrator_path)
+    oof_calibrated_probabilities = calibrator.predict_proba(oof_raw_probabilities)
     calibrated_probabilities = calibrator.predict_proba(raw_probabilities)
     calibrated_predictions = probability_frame(
         validation_features, calibrated_probabilities
@@ -195,11 +211,11 @@ def run_rolling_logistic_experiment(
     calibrated_predictions.to_csv(calibrated_predictions_path, index=False)
 
     threshold_tuning = tune_class_thresholds(
-        calibrated_probabilities,
-        validation_features["label"],
+        oof_calibrated_probabilities,
+        train_features["label"],
         threshold_grid=threshold_grid,
     )
-    threshold_tuning_path = metrics_dir / "threshold_tuning_results.csv"
+    threshold_tuning_path = metrics_dir / "train_oof_threshold_tuning_results.csv"
     threshold_tuning.results.to_csv(threshold_tuning_path, index=False)
     threshold_rule_path = models_dir / "threshold_rule.joblib"
     joblib.dump(threshold_tuning.rule, threshold_rule_path)
@@ -212,12 +228,12 @@ def run_rolling_logistic_experiment(
     threshold_predictions.to_csv(threshold_predictions_path, index=False)
 
     smoothing_selection = tune_smoothing_window(
-        validation_features,
-        calibrated_probabilities,
-        validation_features["label"],
+        train_features,
+        oof_calibrated_probabilities,
+        train_features["label"],
         windows=smoothing_windows,
     )
-    smoothing_tuning_path = metrics_dir / "smoothing_tuning_results.csv"
+    smoothing_tuning_path = metrics_dir / "train_oof_smoothing_tuning_results.csv"
     smoothing_selection.results.to_csv(smoothing_tuning_path, index=False)
     smoothed_probabilities = smooth_probabilities_by_participant(
         validation_features,
@@ -232,13 +248,18 @@ def run_rolling_logistic_experiment(
     )
     smoothed_predictions.to_csv(smoothed_predictions_path, index=False)
 
+    oof_smoothed_probabilities = smooth_probabilities_by_participant(
+        train_features,
+        oof_calibrated_probabilities,
+        window_epochs=smoothing_selection.window_epochs,
+    )
     smoothed_threshold_tuning = tune_class_thresholds(
-        smoothed_probabilities,
-        validation_features["label"],
+        oof_smoothed_probabilities,
+        train_features["label"],
         threshold_grid=threshold_grid,
     )
     smoothed_threshold_tuning_path = (
-        metrics_dir / "smoothed_threshold_tuning_results.csv"
+        metrics_dir / "train_oof_smoothed_threshold_tuning_results.csv"
     )
     smoothed_threshold_tuning.results.to_csv(
         smoothed_threshold_tuning_path, index=False
@@ -328,6 +349,7 @@ def run_rolling_logistic_experiment(
                 "param_grid": LOGISTIC_PARAM_GRID if param_grid is None else param_grid,
                 "threshold_grid": threshold_grid,
                 "smoothing_windows": smoothing_windows,
+                "postprocessing_tuning_source": "train_out_of_fold",
                 "selected_smoothing_window": smoothing_selection.window_epochs,
             },
             indent=2,
@@ -345,6 +367,7 @@ def run_rolling_logistic_experiment(
         correlation_edges_path=correlation_edges_path,
         cv_results_path=cv_results_path,
         best_params_path=best_params_path,
+        train_oof_predictions_path=train_oof_predictions_path,
         metrics_path=metrics_path,
         raw_predictions_path=raw_predictions_path,
         raw_threshold_predictions_path=raw_threshold_predictions_path,
@@ -402,6 +425,34 @@ def _fit_logistic_grid(
     )
     cv_results = _cv_results_frame(search)
     return search.best_estimator_, cv_results, search.best_params_
+
+
+def _out_of_fold_raw_probabilities(
+    train_features: pd.DataFrame,
+    selected_features: list[str],
+    best_params: dict[str, Any],
+    *,
+    random_state: int,
+    cv_splits: int,
+) -> np.ndarray:
+    """Return train-set probabilities from participant-held-out fold models."""
+    estimator = elastic_net_logistic_regression(random_state=random_state).estimator
+    estimator.set_params(**best_params)
+    cv = _group_kfold(train_features["participant_id"], cv_splits)
+    probabilities = np.zeros((len(train_features), len(TARGET_LABELS)), dtype=float)
+    X = train_features[selected_features]
+    y = train_features["label"]
+    groups = train_features["participant_id"]
+
+    for train_indices, holdout_indices in cv.split(X, y, groups):
+        fold_estimator = clone(estimator)
+        fold_estimator.fit(X.iloc[train_indices], y.iloc[train_indices])
+        probabilities[holdout_indices] = align_probabilities(
+            fold_estimator.predict_proba(X.iloc[holdout_indices]),
+            fold_estimator.classes_,
+            TARGET_LABELS,
+        )
+    return probabilities
 
 
 def _cv_results_frame(search: GridSearchCV) -> pd.DataFrame:
