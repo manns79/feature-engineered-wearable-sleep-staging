@@ -12,6 +12,7 @@ from src.models.error_analysis import (
     add_transition_context,
     load_validation_features,
     permutation_importance_frame,
+    run_locked_test_error_analysis,
     run_validation_error_analysis,
     select_validation_model_runs,
 )
@@ -244,7 +245,8 @@ def test_run_validation_error_analysis_writes_validation_only_outputs(tmp_path):
         not in artifact_names
     )
     assert (
-        "basic_statistical_elastic_net_logistic_regression_confusion_true_normalized.png"
+        "basic_statistical_elastic_net_logistic_regression_"
+        "confusion_true_normalized.png"
         in artifact_names
     )
     assert (
@@ -297,3 +299,43 @@ def test_permutation_importance_supports_encoded_label_model_artifacts(tmp_path)
     )
 
     assert set(importance["feature"]) == {"BVP_mean", "HR_mean"}
+
+
+def test_run_locked_test_error_analysis_writes_compact_test_outputs(tmp_path):
+    features_path = tmp_path / "features_test.csv"
+    predictions_path = tmp_path / "locked_test_predictions.csv"
+    features = pd.DataFrame(
+        {
+            "participant_id": ["S001", "S001", "S001", "S002", "S002", "S002"],
+            "epoch_id": [0, 1, 2, 0, 1, 2],
+            "split": ["test"] * 6,
+            "label": ["Wake", "Non-REM", "REM", "Wake", "Non-REM", "Non-REM"],
+            "BVP_mean": [0.0, 1.0, 2.0, 0.1, 1.1, 1.2],
+        }
+    )
+    features.to_csv(features_path, index=False)
+    predictions = features[["participant_id", "epoch_id", "split"]].copy()
+    predictions.insert(0, "candidate", "statistical_summary_only")
+    predictions.insert(1, "ablation", "basic_statistical")
+    predictions.insert(2, "feature_set", "ablation_basic_statistical")
+    predictions.insert(3, "base_model", "elastic_net_logistic_regression")
+    predictions.insert(4, "model", "elastic_net_logistic_regression")
+    predictions.insert(5, "variant", "raw")
+    predictions["true_label"] = features["label"]
+    predictions["pred_label"] = features["label"]
+    predictions.to_csv(predictions_path, index=False)
+
+    outputs = run_locked_test_error_analysis(
+        predictions_path=predictions_path,
+        test_features_path=features_path,
+        epoch_index_path=None,
+        output_dir=tmp_path / "analysis",
+        low_rem_threshold_epochs=2,
+    )
+
+    assert outputs.predictions_path.exists()
+    assert outputs.per_class_metrics_path.exists()
+    assert outputs.low_rem_summary_path.exists()
+    low_rem = pd.read_csv(outputs.low_rem_summary_path)
+    assert set(low_rem["participant_id"]) == {"S001", "S002"}
+    assert low_rem["has_zero_REM_support"].any()

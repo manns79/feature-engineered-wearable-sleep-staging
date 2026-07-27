@@ -64,6 +64,22 @@ class ValidationErrorAnalysisOutputs:
     artifact_index: pd.DataFrame
 
 
+@dataclass(frozen=True)
+class LockedTestErrorAnalysisOutputs:
+    """Paths written by compact locked-test error analysis."""
+
+    analysis_dir: Path
+    metrics_dir: Path
+    config_path: Path
+    artifact_index_path: Path
+    predictions_path: Path
+    per_class_metrics_path: Path
+    per_participant_metrics_path: Path
+    transition_metrics_path: Path
+    low_rem_summary_path: Path
+    artifact_index: pd.DataFrame
+
+
 def run_validation_error_analysis(
     *,
     run_dir: str | Path,
@@ -220,6 +236,91 @@ def run_validation_error_analysis(
     )
 
 
+def run_locked_test_error_analysis(
+    *,
+    predictions_path: str | Path,
+    test_features_path: str | Path = "data/processed/features_test.csv",
+    epoch_index_path: str | Path | None = "data/interim/epoch_index.csv",
+    output_dir: str | Path | None = None,
+    low_rem_threshold_epochs: int = 30,
+) -> LockedTestErrorAnalysisOutputs:
+    """Create compact error-analysis artifacts for locked test predictions."""
+    prediction_path = Path(predictions_path)
+    if not prediction_path.exists():
+        raise FileNotFoundError(f"Prediction CSV does not exist: {prediction_path}")
+    analysis_dir = (
+        Path(output_dir)
+        if output_dir is not None
+        else prediction_path.parent / "test_error_analysis"
+    )
+    metrics_dir = analysis_dir / "metrics"
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+
+    test_features = load_split_features(test_features_path, expected_split="test")
+    epoch_index = load_epoch_index_if_present(epoch_index_path)
+    predictions = load_prediction_file(prediction_path, expected_split="test")
+    predictions = add_prediction_context(
+        predictions,
+        validation_features=test_features,
+        epoch_index=epoch_index,
+    )
+    predictions = add_transition_context(predictions)
+
+    per_class_metrics = per_class_metrics_frame(predictions)
+    per_participant_metrics = per_participant_metrics_frame(predictions)
+    transition_metrics = transition_metrics_frame(predictions)
+    low_rem_summary = low_rem_participant_summary(
+        per_participant_metrics,
+        threshold_epochs=low_rem_threshold_epochs,
+    )
+
+    artifact_rows: list[dict[str, object]] = []
+    enriched_predictions_path = metrics_dir / "locked_test_predictions_with_context.csv"
+    per_class_metrics_path = metrics_dir / "per_model_per_class_metrics.csv"
+    per_participant_metrics_path = metrics_dir / "per_participant_metrics.csv"
+    transition_metrics_path = metrics_dir / "transition_distance_metrics.csv"
+    low_rem_summary_path = metrics_dir / "low_rem_participant_summary.csv"
+    config_path = analysis_dir / "test_error_analysis_config.json"
+    artifact_index_path = analysis_dir / "artifact_index.csv"
+
+    _write_csv(predictions, enriched_predictions_path, artifact_rows, "metrics")
+    _write_csv(per_class_metrics, per_class_metrics_path, artifact_rows, "metrics")
+    _write_csv(
+        per_participant_metrics, per_participant_metrics_path, artifact_rows, "metrics"
+    )
+    _write_csv(transition_metrics, transition_metrics_path, artifact_rows, "metrics")
+    _write_csv(low_rem_summary, low_rem_summary_path, artifact_rows, "metrics")
+
+    config = {
+        "predictions_path": str(prediction_path),
+        "test_features_path": str(test_features_path),
+        "epoch_index_path": str(epoch_index_path) if epoch_index_path else None,
+        "output_dir": str(analysis_dir),
+        "low_rem_threshold_epochs": low_rem_threshold_epochs,
+        "scope": (
+            "Locked test error analysis from frozen final predictions; no model "
+            "selection or post-processing is fit here."
+        ),
+    }
+    config_path.write_text(json.dumps(config, indent=2, default=str) + "\n")
+    artifact_rows.append(_artifact_row(config_path, "config"))
+    artifact_index = pd.DataFrame(artifact_rows)
+    artifact_index.to_csv(artifact_index_path, index=False)
+
+    return LockedTestErrorAnalysisOutputs(
+        analysis_dir=analysis_dir,
+        metrics_dir=metrics_dir,
+        config_path=config_path,
+        artifact_index_path=artifact_index_path,
+        predictions_path=enriched_predictions_path,
+        per_class_metrics_path=per_class_metrics_path,
+        per_participant_metrics_path=per_participant_metrics_path,
+        transition_metrics_path=transition_metrics_path,
+        low_rem_summary_path=low_rem_summary_path,
+        artifact_index=artifact_index,
+    )
+
+
 def load_run_config(run_dir: str | Path) -> dict[str, Any]:
     """Load an ablation run config JSON."""
     path = Path(run_dir) / "run_config.json"
@@ -301,21 +402,24 @@ def select_validation_model_runs(
 
 def load_validation_features(path: str | Path) -> pd.DataFrame:
     """Load the validation feature table with stable participant IDs."""
+    return load_split_features(path, expected_split="validation")
+
+
+def load_split_features(path: str | Path, *, expected_split: str) -> pd.DataFrame:
+    """Load one labeled feature table for split-specific analysis."""
     feature_path = Path(path)
     if not feature_path.exists():
-        raise FileNotFoundError(
-            f"Validation feature CSV does not exist: {feature_path}"
-        )
+        raise FileNotFoundError(f"Feature CSV does not exist: {feature_path}")
     frame = pd.read_csv(feature_path, dtype={"participant_id": str})
     required = set(FEATURE_ID_COLUMNS)
     missing = sorted(required - set(frame.columns))
     if missing:
-        raise ValueError(f"Validation feature CSV is missing column(s): {missing}")
-    non_validation = sorted(set(frame["split"]) - {"validation"})
-    if non_validation:
+        raise ValueError(f"Feature CSV is missing column(s): {missing}")
+    invalid_splits = sorted(set(frame["split"]) - {expected_split})
+    if invalid_splits:
         raise ValueError(
-            "Validation error analysis must receive the validation feature table only; "
-            f"found split value(s): {non_validation}"
+            f"Analysis must receive the {expected_split} feature table only; "
+            f"found split value(s): {invalid_splits}"
         )
     return frame
 
@@ -381,6 +485,32 @@ def load_selected_predictions(selected_models: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
+def load_prediction_file(path: str | Path, *, expected_split: str) -> pd.DataFrame:
+    """Load a prediction CSV for one expected split."""
+    prediction = pd.read_csv(path, dtype={"participant_id": str})
+    required = {
+        "participant_id",
+        "epoch_id",
+        "split",
+        "true_label",
+        "pred_label",
+        "ablation",
+        "model",
+    }
+    missing = sorted(required - set(prediction.columns))
+    if missing:
+        raise ValueError(f"Prediction CSV is missing column(s): {missing}")
+    invalid_splits = sorted(set(prediction["split"]) - {expected_split})
+    if invalid_splits:
+        raise ValueError(
+            f"Prediction CSV must contain only split={expected_split!r}; "
+            f"found split value(s): {invalid_splits}"
+        )
+    if "feature_set" not in prediction.columns:
+        prediction["feature_set"] = prediction["ablation"]
+    return prediction
+
+
 def add_prediction_context(
     predictions: pd.DataFrame,
     *,
@@ -430,18 +560,21 @@ def add_prediction_context(
     ]
     if set(keys).issubset(metadata_columns):
         metadata = epoch_index[metadata_columns].copy()
-        metadata = metadata[metadata["split"] == "validation"]
+        prediction_splits = sorted(set(output["split"]))
+        if len(prediction_splits) == 1:
+            metadata = metadata[metadata["split"] == prediction_splits[0]]
         output = output.merge(metadata, on=keys, how="left", validate="many_to_one")
     return output
 
 
 def add_transition_context(predictions: pd.DataFrame) -> pd.DataFrame:
     """Annotate rows with participant-contained sleep-stage transition proximity."""
+    group_columns = model_group_columns(predictions)
     output = predictions.sort_values(
-        ["ablation", "model", "participant_id", "epoch_id"]
+        [*group_columns, "participant_id", "epoch_id"]
     ).copy()
     pieces = []
-    for (_, _), group in output.groupby(["ablation", "model"], sort=False):
+    for _, group in output.groupby(group_columns, sort=False):
         group = group.copy()
         group["previous_true_label"] = group.groupby("participant_id")[
             "true_label"
@@ -486,8 +619,10 @@ def transition_distance_bin(distance: object) -> str:
 def per_class_metrics_frame(predictions: pd.DataFrame) -> pd.DataFrame:
     """Return one precision/recall/F1 row per class and selected model."""
     rows: list[dict[str, object]] = []
-    for keys, group in predictions.groupby(["ablation", "model", "feature_set"]):
-        ablation, model, feature_set = keys
+    group_columns = model_group_columns(predictions)
+    for keys, group in predictions.groupby(group_columns):
+        key_values = (keys,) if len(group_columns) == 1 else keys
+        metadata = dict(zip(group_columns, key_values, strict=True))
         precision, recall, f1, support = precision_recall_fscore_support(
             group["true_label"],
             group["pred_label"],
@@ -499,9 +634,7 @@ def per_class_metrics_frame(predictions: pd.DataFrame) -> pd.DataFrame:
         ):
             rows.append(
                 {
-                    "ablation": ablation,
-                    "model": model,
-                    "feature_set": feature_set,
+                    **metadata,
                     "label": label,
                     "precision": float(p_value),
                     "recall": float(r_value),
@@ -515,19 +648,16 @@ def per_class_metrics_frame(predictions: pd.DataFrame) -> pd.DataFrame:
 def per_participant_metrics_frame(predictions: pd.DataFrame) -> pd.DataFrame:
     """Return participant-level validation metrics for selected models."""
     rows: list[dict[str, object]] = []
-    for keys, group in predictions.groupby(
-        ["ablation", "model", "feature_set", "participant_id"]
-    ):
-        ablation, model, feature_set, participant_id = keys
+    group_columns = [*model_group_columns(predictions), "participant_id"]
+    for keys, group in predictions.groupby(group_columns):
+        key_values = (keys,) if len(group_columns) == 1 else keys
+        metadata = dict(zip(group_columns, key_values, strict=True))
         metrics = classification_metrics(
             group["true_label"], group["pred_label"], labels=TARGET_LABELS
         )
         rows.append(
             {
-                "ablation": ablation,
-                "model": model,
-                "feature_set": feature_set,
-                "participant_id": participant_id,
+                **metadata,
                 "n_epochs": len(group),
                 "REM_support": int((group["true_label"] == "REM").sum()),
                 **metrics,
@@ -539,23 +669,19 @@ def per_participant_metrics_frame(predictions: pd.DataFrame) -> pd.DataFrame:
 def transition_metrics_frame(predictions: pd.DataFrame) -> pd.DataFrame:
     """Return validation metrics by distance to the nearest true-label transition."""
     rows: list[dict[str, object]] = []
-    grouped = predictions.groupby(
-        ["ablation", "model", "feature_set", "transition_distance_bin"],
-        observed=False,
-    )
+    group_columns = [*model_group_columns(predictions), "transition_distance_bin"]
+    grouped = predictions.groupby(group_columns, observed=False)
     for keys, group in grouped:
         if group.empty:
             continue
-        ablation, model, feature_set, transition_bin = keys
+        key_values = (keys,) if len(group_columns) == 1 else keys
+        metadata = dict(zip(group_columns, key_values, strict=True))
         metrics = classification_metrics(
             group["true_label"], group["pred_label"], labels=TARGET_LABELS
         )
         rows.append(
             {
-                "ablation": ablation,
-                "model": model,
-                "feature_set": feature_set,
-                "transition_distance_bin": transition_bin,
+                **metadata,
                 "n_epochs": len(group),
                 "REM_support": int((group["true_label"] == "REM").sum()),
                 **metrics,
@@ -572,6 +698,39 @@ def transition_metrics_frame(predictions: pd.DataFrame) -> pd.DataFrame:
             ["ablation", "model", "transition_distance_bin"]
         ).reset_index(drop=True)
     return frame
+
+
+def low_rem_participant_summary(
+    per_participant_metrics: pd.DataFrame,
+    *,
+    threshold_epochs: int = 30,
+) -> pd.DataFrame:
+    """Return participant-model rows where test REM support is low."""
+    if per_participant_metrics.empty:
+        return per_participant_metrics.copy()
+    output = per_participant_metrics.copy()
+    output["low_REM_support_threshold_epochs"] = threshold_epochs
+    output["is_low_REM_support"] = output["REM_support"] < threshold_epochs
+    output["has_zero_REM_support"] = output["REM_support"] == 0
+    return output[
+        output["is_low_REM_support"] | output["has_zero_REM_support"]
+    ].reset_index(drop=True)
+
+
+def model_group_columns(frame: pd.DataFrame) -> list[str]:
+    """Return available model-identifying columns in reporting order."""
+    preferred = (
+        "candidate",
+        "ablation",
+        "feature_set",
+        "base_model",
+        "model",
+        "variant",
+    )
+    columns = [column for column in preferred if column in frame.columns]
+    if not columns:
+        raise ValueError("Frame does not contain any model-identifying columns.")
+    return columns
 
 
 def model_family_comparison_frame(selected_models: pd.DataFrame) -> pd.DataFrame:

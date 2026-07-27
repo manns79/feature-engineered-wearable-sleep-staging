@@ -14,6 +14,8 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Completed rolling logistic experiment run directory.",
     )
+    parser.add_argument("--train-features", default="data/processed/features_train.csv")
+    parser.add_argument("--val-features", default="data/processed/features_val.csv")
     parser.add_argument("--test-features", default="data/processed/features_test.csv")
     parser.add_argument(
         "--prior-ablation-run-dir",
@@ -32,6 +34,8 @@ def main() -> None:
     args = parse_args()
     outputs = run_locked_test_evaluation(
         rolling_run_dir=args.rolling_run_dir,
+        train_features_path=args.train_features,
+        validation_features_path=args.val_features,
         test_features_path=args.test_features,
         prior_ablation_run_dir=args.prior_ablation_run_dir,
         output_dir=args.output_dir,
@@ -39,6 +43,9 @@ def main() -> None:
     print(f"Wrote locked test metrics to {outputs.metrics_path}")
     print(f"Wrote locked test predictions to {outputs.predictions_path}")
     print(f"Wrote locked test confusion matrices to {outputs.confusion_path}")
+    if outputs.comparison_path is not None:
+        print(f"Wrote final comparison table to {outputs.comparison_path}")
+    print(f"Wrote final test protocol to {outputs.protocol_path}")
 
 
 if __name__ == "__main__":

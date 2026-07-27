@@ -180,6 +180,19 @@ XGBoost SHAP summary plots when `shap` is installed. Use
 side. This step must use `data/processed/features_val.csv`; do not point it at
 the held-out test feature table.
 
+After the final model roster and post-processing protocol are frozen, generate
+the locked held-out test artifacts with:
+
+```bash
+python scripts/run_final_test_evaluation.py
+```
+
+The frozen protocol is documented in `docs/final_test_protocol.md`. The command
+writes the primary validation/test comparison table, locked test predictions,
+compact locked-test error-analysis CSVs, and a generated protocol JSON under
+`outputs/runs/final_test_evaluation/`. Review the generated outputs with
+`notebooks/04_locked_test_evaluation.ipynb`.
+
 If your DREAMT CSVs are not sampled at 64 Hz, pass the correct sampling rate or
 explicit rows per 30-second epoch:
 
