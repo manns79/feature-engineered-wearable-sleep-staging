@@ -174,6 +174,37 @@ def save_feature_importance_plot(
     return output
 
 
+def save_signed_feature_contrast_plot(
+    contrasts: pd.DataFrame,
+    path: str | Path,
+    *,
+    value_column: str = "contrast_coefficient",
+    label_column: str = "feature",
+    rank_column: str = "rank",
+    title: str,
+    max_features: int = 20,
+) -> Path:
+    """Save a signed horizontal bar chart for coefficient contrasts."""
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    top = contrasts.sort_values(rank_column).head(max_features).copy()
+    top = top.sort_values(value_column)
+    fig_height = max(4, 0.32 * len(top))
+    fig, ax = plt.subplots(figsize=(8, fig_height))
+    sns.barplot(data=top, x=value_column, y=label_column, ax=ax, color="#4C78A8")
+    ax.axvline(0, color="black", linewidth=0.8)
+    ax.set_xlabel("Standardized coefficient contrast")
+    ax.set_ylabel("Feature")
+    ax.set_title(title)
+    fig.tight_layout()
+    fig.savefig(output, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    return output
+
+
 def save_xgboost_shap_summary(
     model: Any,
     X: pd.DataFrame,

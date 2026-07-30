@@ -41,3 +41,15 @@ python scripts/run_final_test_evaluation.py
 
 By default this writes final artifacts under
 `outputs/runs/final_test_evaluation/`.
+
+## Rolling Logistic Interpretation
+
+After final test artifacts exist, generate script-only interpretation artifacts
+for the interpretable rolling logistic model with:
+
+```bash
+python scripts/run_rolling_logistic_interpretation.py
+```
+
+This interprets raw-model standardized coefficients separately from
+post-processing variants, which are summarized as operating-point changes.

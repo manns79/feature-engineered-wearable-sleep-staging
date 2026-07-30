@@ -190,8 +190,20 @@ python scripts/run_final_test_evaluation.py
 The frozen protocol is documented in `docs/final_test_protocol.md`. The command
 writes the primary validation/test comparison table, locked test predictions,
 compact locked-test error-analysis CSVs, and a generated protocol JSON under
-`outputs/runs/final_test_evaluation/`. Review the generated outputs with
-`notebooks/04_locked_test_evaluation.ipynb`.
+`outputs/runs/final_test_evaluation/`. Review the generated CSVs and
+`outputs/runs/final_test_evaluation/test_error_analysis/artifact_index.csv`.
+
+To generate deeper interpretation artifacts for the finalized interpretable
+rolling logistic model, run:
+
+```bash
+python scripts/run_rolling_logistic_interpretation.py
+```
+
+This writes standardized coefficient tables, class-contrast summaries,
+REM-focused error summaries, participant metrics, transition-distance metrics,
+and compact figures under
+`outputs/runs/final_test_evaluation/rolling_logistic_interpretation/`.
 
 If your DREAMT CSVs are not sampled at 64 Hz, pass the correct sampling rate or
 explicit rows per 30-second epoch:
