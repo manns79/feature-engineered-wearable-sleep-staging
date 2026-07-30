@@ -1,0 +1,9 @@
+ablation,display_name,best_model,n_features,validation_macro_f1,validation_accuracy
+basic_statistical,Basic statistical summaries,elastic_net_logistic_regression,117,0.3852268441265439,0.4212189240874698
+basic_plus_signal_specific,Basic + signal-specific,elastic_net_logistic_regression,134,0.3845529453793364,0.4196391452565062
+basic_signal_specific_rolling,Basic + signal-specific + rolling context,random_forest,194,0.4520695796447216,0.5313877109836201
+basic_signal_specific_rolling_subject_norm,All engineered feature families,elastic_net_logistic_regression,319,0.4701849362273965,0.5204955516753971
+signal_group_movement,Movement signal group,random_forest,120,0.4557503930710449,0.55874282863557
+signal_group_cardiovascular,Cardiovascular signal group,random_forest,125,0.4247269722914589,0.4848258085973227
+signal_group_temperature,Temperature signal group,random_forest,35,0.384882631768555,0.5323023197804939
+signal_group_electrodermal,Electrodermal signal group,random_forest,39,0.3807341211661599,0.5220753305063607
