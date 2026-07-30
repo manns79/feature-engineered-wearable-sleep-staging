@@ -1,7 +1,7 @@
 # Feature-Engineered Machine Learning for Wearable Sleep Staging
 
 This repository extends the sibling
-[`dreamt-wearable-sleep-staging`](../dreamt-wearable-sleep-staging)
+[`dreamt-wearable-sleep-staging`](https://github.com/manns79/dreamt-wearable-sleep-staging)
 project on the same DREAMT wearable sleep-staging task: classifying each
 30-second epoch as `Wake`, `Non-REM`, or `REM`. The earlier project compared
 traditional baselines with deep learning models. This project asks whether
