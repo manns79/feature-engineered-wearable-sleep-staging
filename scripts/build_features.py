@@ -8,6 +8,7 @@ from src.features.build_features import FEATURE_SETS, build_and_write_feature_ta
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options for feature-table generation."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw-dir", default="data/raw")
     parser.add_argument("--epoch-index", default="data/interim/epoch_index.csv")
@@ -27,6 +28,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Build requested feature tables and report the written paths."""
     args = parse_args()
     written = build_and_write_feature_tables(
         raw_dir=args.raw_dir,

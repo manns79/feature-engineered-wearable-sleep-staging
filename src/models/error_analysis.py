@@ -1097,10 +1097,12 @@ class _EncodedLabelEstimator(ClassifierMixin, BaseEstimator):
         return self
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
+        """Predict decoded sleep-stage labels from an encoded estimator."""
         encoded = self.estimator.predict(X)
         return self.label_encoder.inverse_transform(encoded.astype(int))
 
     def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
+        """Return class probabilities from the wrapped estimator."""
         return self.estimator.predict_proba(X)
 
 

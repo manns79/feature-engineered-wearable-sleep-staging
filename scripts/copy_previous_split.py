@@ -8,6 +8,7 @@ from src.data.splits import (
 
 
 def main() -> None:
+    """Copy the reusable participant split file into the local data tree."""
     output = copy_previous_project_splits()
     print(f"Copied prior project split assignments to {output}")
 

@@ -11,6 +11,7 @@ from src.models.rolling_logistic_interpretation import (
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options for rolling logistic interpretation outputs."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--rolling-run-dir",
@@ -61,6 +62,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Generate coefficient, error-group, and plot artifacts."""
     args = parse_args()
     outputs = run_rolling_logistic_interpretation(
         rolling_run_dir=args.rolling_run_dir,

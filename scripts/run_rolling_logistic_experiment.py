@@ -11,6 +11,7 @@ from src.models.sequence_postprocessing import DEFAULT_SMOOTHING_WINDOWS
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options for the rolling logistic experiment."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--train-features", default="data/processed/features_train.csv")
     parser.add_argument("--val-features", default="data/processed/features_val.csv")
@@ -44,6 +45,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run the train-OOF tuned rolling logistic validation experiment."""
     args = parse_args()
     outputs = run_rolling_logistic_experiment(
         train_features_path=args.train_features,

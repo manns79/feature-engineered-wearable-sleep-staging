@@ -9,6 +9,7 @@ from src.data.make_epochs import audit_epoch_alignment_for_raw_dir
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options for the epoch-alignment audit."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw-dir", default="data/raw")
     parser.add_argument("--output", default="outputs/metrics/epoch_alignment_audit.csv")
@@ -29,6 +30,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run the audit and print a compact flagged-participant summary."""
     args = parse_args()
     audit = audit_epoch_alignment_for_raw_dir(
         args.raw_dir,

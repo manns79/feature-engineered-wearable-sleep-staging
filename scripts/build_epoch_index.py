@@ -8,6 +8,7 @@ from src.data.make_epochs import save_epoch_index
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options for DREAMT epoch-index construction."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--raw-dir", default="data/raw")
     parser.add_argument(
@@ -41,6 +42,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Build and write the split-aware epoch index."""
     args = parse_args()
     output = save_epoch_index(
         raw_dir=args.raw_dir,

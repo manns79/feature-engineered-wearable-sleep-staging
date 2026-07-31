@@ -11,6 +11,7 @@ from src.models.error_analysis import (
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options for validation error analysis."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--run-dir",
@@ -83,6 +84,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run validation-only error analysis for selected model artifacts."""
     args = parse_args()
     models = [model for group in args.model for model in group]
     ablations = [ablation for group in args.ablation for ablation in group]

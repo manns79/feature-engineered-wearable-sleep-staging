@@ -8,6 +8,7 @@ from src.models.ablations import run_ablation_experiments
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options for validation ablation experiments."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--train-features", default="data/processed/features_train.csv")
     parser.add_argument("--val-features", default="data/processed/features_val.csv")
@@ -57,6 +58,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run selected ablations and print the main artifact paths."""
     args = parse_args()
     ablation_names = [
         ablation_name

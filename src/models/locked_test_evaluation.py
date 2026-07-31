@@ -143,6 +143,8 @@ def run_locked_test_evaluation(
             run for run in prior_runs if run.spec.apply_postprocessing
         ]
         if postprocessed_runs:
+            # Calibrators, smoothing windows, and thresholds are fit from
+            # train-OOF evidence only; the held-out test split is read later.
             train_features = _load_split_features(
                 train_features_path, expected_split="train"
             )

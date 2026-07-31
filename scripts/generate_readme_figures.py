@@ -24,6 +24,8 @@ RESULTS = ROOT / "results"
 SUMMARY = RESULTS / "summary"
 FIGURES = RESULTS / "figures"
 
+# These paths intentionally point at saved local outputs; this script curates
+# README evidence and does not train, tune, or re-evaluate models.
 FINAL = ROOT / "outputs" / "runs" / "final_test_evaluation"
 ABLATION = ROOT / "outputs" / "runs" / "full_ablation_20260718"
 ROLLING = FINAL / "rolling_logistic_interpretation"
@@ -88,6 +90,7 @@ SIGNAL_GROUP_ABLATIONS = [
 
 
 def main() -> None:
+    """Regenerate tracked README summary tables, figures, and manifests."""
     SUMMARY.mkdir(parents=True, exist_ok=True)
     FIGURES.mkdir(parents=True, exist_ok=True)
     key_results = write_key_results()
@@ -103,6 +106,7 @@ def main() -> None:
 
 
 def write_key_results() -> pd.DataFrame:
+    """Write the README key-results table from final and prior-project outputs."""
     comparison = pd.read_csv(FINAL / "final_comparison_table.csv")
     previous = pd.read_csv(PREVIOUS / "key_results.csv")
     rows: list[dict[str, object]] = []
@@ -163,6 +167,7 @@ def write_key_results() -> pd.DataFrame:
 
 
 def write_ablation_summary() -> pd.DataFrame:
+    """Write best validation score summaries for README ablation discussion."""
     metrics = pd.read_csv(ABLATION / "metrics" / "ablation_validation_metrics.csv")
     ablations = [
         "basic_statistical",
@@ -206,6 +211,7 @@ def write_ablation_summary() -> pd.DataFrame:
 
 
 def write_validation_ablation_mean_metrics() -> None:
+    """Write validation F1 averages used by README ablation figures."""
     write_validation_ablation_mean_metric_file(
         FEATURE_FAMILY_ABLATIONS,
         SUMMARY / "validation_feature_family_mean_metrics.csv",
@@ -220,6 +226,7 @@ def write_validation_ablation_mean_metric_file(
     ablations: list[tuple[str, str]],
     output_path: Path,
 ) -> pd.DataFrame:
+    """Average validation F1 across learned model families for ablations."""
     metrics = pd.read_csv(ABLATION / "metrics" / "ablation_validation_metrics.csv")
     order = {ablation: index for index, (ablation, _) in enumerate(ablations)}
     labels = dict(ablations)
@@ -251,6 +258,7 @@ def write_validation_ablation_mean_metric_file(
 
 
 def write_interpretation_summary() -> None:
+    """Copy compact rolling-logistic interpretation CSVs into results."""
     files = {
         "coefficient_contrast_summary.csv": (
             ROLLING / "metrics" / "coefficient_contrast_summary.csv"
@@ -265,6 +273,7 @@ def write_interpretation_summary() -> None:
 
 
 def make_postprocessing_tradeoff_figure() -> None:
+    """Plot test F1 tradeoffs across rolling-logistic post-processing variants."""
     variant_order = [
         "raw",
         "platt",
@@ -375,6 +384,7 @@ def derived_raw_smoothing_metrics() -> pd.DataFrame:
 
 
 def make_validation_ablation_figures() -> None:
+    """Create README figures for feature-family and signal-group ablations."""
     feature_families = pd.read_csv(
         SUMMARY / "validation_feature_family_mean_metrics.csv"
     )
@@ -396,6 +406,7 @@ def make_validation_ablation_figure(
     output_path: Path,
     title: str,
 ) -> None:
+    """Create one grouped horizontal F1 bar chart from an ablation summary."""
     plot_frame = summary.melt(
         id_vars=["display_name", "display_order"],
         value_vars=VALIDATION_F1_COLUMNS,
@@ -425,6 +436,7 @@ def make_validation_ablation_figure(
 
 
 def make_transition_distance_figure() -> None:
+    """Plot locked-test macro F1 by distance to true stage transitions."""
     metrics = pd.read_csv(
         FINAL / "test_error_analysis" / "metrics" / "transition_distance_metrics.csv"
     )
@@ -457,11 +469,13 @@ def make_transition_distance_figure() -> None:
 
 
 def make_limitation_figures() -> None:
+    """Create README figures illustrating final-model limitations."""
     make_rem_prediction_composition_figure()
     make_participant_rem_support_figure()
 
 
 def make_rem_prediction_composition_figure() -> None:
+    """Plot the true-label composition of raw rolling-logistic REM predictions."""
     predictions = pd.read_csv(ROLLING / "metrics" / "rem_error_predictions.csv")
     predicted_rem = predictions[predictions["pred_label"] == "REM"].copy()
     counts = (
@@ -513,6 +527,7 @@ def make_rem_prediction_composition_figure() -> None:
 
 
 def make_participant_rem_support_figure() -> None:
+    """Plot participant-level REM F1 against held-out REM support."""
     metrics = pd.read_csv(ROLLING / "metrics" / "per_participant_metrics.csv")
     selected = metrics[metrics["variant"] == "raw_threshold_tuned"].copy()
     selected = selected.sort_values("REM_support")
@@ -549,6 +564,7 @@ def make_participant_rem_support_figure() -> None:
 
 
 def make_coefficient_contrast_figure() -> None:
+    """Plot the largest REM-vs-Non-REM rolling-logistic coefficient contrasts."""
     contrasts = pd.read_csv(ROLLING / "metrics" / "coefficient_contrasts.csv")
     subset = (
         contrasts[contrasts["contrast"] == "REM_vs_Non-REM"]
@@ -581,6 +597,7 @@ def make_coefficient_contrast_figure() -> None:
 
 
 def write_artifact_manifest(key_results: pd.DataFrame) -> None:
+    """Write machine-readable and Markdown manifests for tracked results."""
     manifest = pd.DataFrame(
         [
             {
@@ -733,6 +750,7 @@ def write_artifact_manifest(key_results: pd.DataFrame) -> None:
 
 
 def manifest_markdown(key_results: pd.DataFrame) -> str:
+    """Return the Markdown manifest text for tracked README artifacts."""
     return """# Results Manifest
 
 This directory contains a compact, tracked subset of result artifacts used by

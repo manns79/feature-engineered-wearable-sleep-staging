@@ -8,6 +8,7 @@ from src.models.training import train_and_evaluate_model_set
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options for first-milestone model training."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--train-features", default="data/processed/features_train.csv")
     parser.add_argument("--val-features", default="data/processed/features_val.csv")
@@ -20,6 +21,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Train baseline model families and evaluate them on validation data."""
     args = parse_args()
     outputs = train_and_evaluate_model_set(
         feature_paths={

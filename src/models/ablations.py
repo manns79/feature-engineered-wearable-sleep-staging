@@ -461,6 +461,7 @@ def run_ablation_experiments(
             ablation_name: str = spec.name,
             ablation_dir: Path = ablation_output_dir,
         ) -> None:
+            """Attach ablation context to per-model progress events."""
             _append_status(
                 status_rows,
                 status_path,

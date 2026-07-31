@@ -9,6 +9,7 @@ from src.models.locked_test_evaluation import run_locked_test_evaluation
 
 
 def parse_args() -> argparse.Namespace:
+    """Parse command-line options for the final locked-test workflow."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--rolling-run-dir",
@@ -48,6 +49,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> None:
+    """Run final model evaluation followed by compact test error analysis."""
     args = parse_args()
     evaluation = run_locked_test_evaluation(
         rolling_run_dir=args.rolling_run_dir,
