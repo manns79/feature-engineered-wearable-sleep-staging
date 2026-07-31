@@ -106,11 +106,11 @@ can look REM-like in this feature space.
 
 ## Validation Ablation Findings
 
-The first set of ablation experiments focused on feature families: within-epoch statistical summaries, signal-specific physiological features, centered rolling temporal-context features, and whole-night participant-normalized features. These signal families were added sequentially to each model family. As illustrated by the figure below, results indicate that temporal-context features carry the most information.
+The first set of ablation experiments focused on feature families: within-epoch statistical summaries, signal-specific physiological features, centered rolling temporal-context features, and whole-night participant-normalized features. These signal families were added sequentially to each model family. As illustrated by the figure below, results indicate that temporal-context features carry the most information. Note that this figure was produce by averaging F1 scores across model families (performance across families was similar).
 
 ![Feature-family validation ablations](results/figures/validation_feature_family_ablation.png)
 
-The second set of ablation experiments focused on signal groups: movement, cardiovascular, electrodermal, and skin temperature. Each model family used a single signal group for prediction, then the experiment iterated through the different signal groups. The results, summarized by the figure below, suggest that movement and cardiovascular signals are the most predictive.
+The second set of ablation experiments focused on signal groups: movement, cardiovascular, electrodermal, and skin temperature. Each model family used a single signal group for prediction, then the experiment iterated through the different signal groups. The results, summarized by the figure below, suggest that movement and cardiovascular signals are the most predictive. Similar to the previous figure, F1 scores were averaged across model families.
 
 ![Signal-group validation ablations](results/figures/validation_signal_group_ablation.png)
 
@@ -207,16 +207,22 @@ python scripts/run_rolling_logistic_interpretation.py
 
 ## Limitations
 
-- Movement features help separate `Wake` from sleep states; however, as illustrated below using the interpretable logistic model, "quiet" `Non-REM` is often treated as `REM`.
-  and thresholding.
-- Model performance declines near sleep-stage transitions. 
+For each limitation described below, the figure that follows uses the interpretable logistic regression model to illustrate the limitation.
+
+- Movement features help separate `Wake` from sleep states; however, "quiet" `Non-REM` is often treated as `REM`.
+
+![REM prediction composition](results/figures/rolling_rem_prediction_composition.png)
+
+- Model performance declines near sleep-stage transitions.
 
 ![Transition-distance macro F1](results/figures/transition_distance_macro_f1.png)
 
-- `REM` support (i.e., the number of `REM` epochs) is very low for certain participants, which makes participant-level performance difficult to assess. 
+- `REM` support (i.e., the number of `REM` epochs) is very low for certain participants, which makes participant-level performance difficult to assess.
+
+![Participant REM support](results/figures/rolling_participant_rem_support.png)
 
 ## Future work
 
-- Given the relative success of disinguishing `Wake` from `Non-REM` and `REM`, hierarchical modeling may improve performance on sleep states.
-- Results suggest that temporal-context, movement signals, and cardiovascular signals are informative; however, verifying these conclusions on datasets other than DREAMT would strengthen results. 
+- Given the relative success of disinguishing `Wake` from `Non-REM` and `REM`, a reasonable next step is using hierarchical modeling to try to improve separation of sleep states.
+- Results suggest that temporal-context, movement signals, and cardiovascular signals are informative; however, verifying these conclusions on datasets other than DREAMT would add credibility. 
 - To help assess whether additional complexity earns its keep in this problem, quantify the difference in training time between traditional ML and DL models.

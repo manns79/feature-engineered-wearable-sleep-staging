@@ -18,6 +18,9 @@ curated evidence set.
   `summary/rolling_rem_error_counts.csv`, and
   `summary/rolling_transition_distance_metrics.csv` support the rolling
   logistic interpretation discussion.
+- `summary/rolling_rem_prediction_composition.csv` and
+  `summary/rolling_participant_rem_support.csv` support the README limitation
+  figures.
 - `summary/artifact_manifest.csv` maps each curated file to its source
   artifact, metric scope, and README claim.
 
@@ -34,6 +37,10 @@ curated evidence set.
   and XGBoost.
 - `figures/transition_distance_macro_f1.png` summarizes locked-test macro F1 by
   distance to the nearest true sleep-stage transition.
+- `figures/rolling_rem_prediction_composition.png` shows the true-label
+  composition of epochs predicted as `REM` by the raw rolling logistic model.
+- `figures/rolling_participant_rem_support.png` shows participant-level `REM`
+  F1 versus `REM` support for the threshold-tuned rolling logistic model.
 - `figures/rolling_logistic_rem_contrast.png` shows the largest standardized
   rolling-logistic coefficient contrasts for `REM` versus `Non-REM`.
 

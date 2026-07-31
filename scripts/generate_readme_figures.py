@@ -97,6 +97,7 @@ def main() -> None:
     make_postprocessing_tradeoff_figure()
     make_validation_ablation_figures()
     make_transition_distance_figure()
+    make_limitation_figures()
     make_coefficient_contrast_figure()
     write_artifact_manifest(key_results)
 
@@ -468,6 +469,107 @@ def make_transition_distance_figure() -> None:
     plt.close()
 
 
+def make_limitation_figures() -> None:
+    make_rem_prediction_composition_figure()
+    make_participant_rem_support_figure()
+
+
+def make_rem_prediction_composition_figure() -> None:
+    predictions = pd.read_csv(ROLLING / "metrics" / "rem_error_predictions.csv")
+    predicted_rem = predictions[predictions["pred_label"] == "REM"].copy()
+    counts = (
+        predicted_rem["true_label"]
+        .value_counts()
+        .rename_axis("true_label")
+        .reset_index(name="n_epochs")
+    )
+    label_order = ["Non-REM", "REM", "Wake"]
+    counts["display_order"] = counts["true_label"].map(
+        {label: index for index, label in enumerate(label_order)}
+    )
+    counts = counts.sort_values("display_order")
+    counts["fraction_of_predicted_rem"] = counts["n_epochs"] / counts[
+        "n_epochs"
+    ].sum()
+    counts.to_csv(SUMMARY / "rolling_rem_prediction_composition.csv", index=False)
+
+    plt.figure(figsize=(7.8, 3.8))
+    ax = sns.barplot(
+        data=counts,
+        x="n_epochs",
+        y="true_label",
+        hue="true_label",
+        order=label_order,
+        palette={
+            "Non-REM": "#72b7b2",
+            "REM": "#f58518",
+            "Wake": "#54a24b",
+        },
+        legend=False,
+    )
+    total = counts["n_epochs"].sum()
+    for patch, row in zip(ax.patches, counts.itertuples(index=False), strict=True):
+        ax.text(
+            patch.get_width() + total * 0.015,
+            patch.get_y() + patch.get_height() / 2,
+            f"{row.n_epochs:,} ({row.fraction_of_predicted_rem:.0%})",
+            va="center",
+            fontsize=9,
+        )
+    ax.set_xlim(0, total * 0.88)
+    ax.set_xlabel("Epochs predicted as REM")
+    ax.set_ylabel("True label")
+    ax.set_title("Raw rolling logistic REM predictions were mostly Non-REM")
+    plt.tight_layout()
+    plt.savefig(FIGURES / "rolling_rem_prediction_composition.png", dpi=160)
+    plt.close()
+
+
+def make_participant_rem_support_figure() -> None:
+    metrics = pd.read_csv(ROLLING / "metrics" / "per_participant_metrics.csv")
+    selected = metrics[metrics["variant"] == "raw_threshold_tuned"].copy()
+    selected = selected.sort_values("REM_support")
+    selected[
+        [
+            "participant_id",
+            "n_epochs",
+            "REM_support",
+            "macro_f1",
+            "REM_f1",
+        ]
+    ].to_csv(SUMMARY / "rolling_participant_rem_support.csv", index=False)
+
+    plt.figure(figsize=(7.8, 4.4))
+    ax = sns.scatterplot(
+        data=selected,
+        x="REM_support",
+        y="REM_f1",
+        size="n_epochs",
+        sizes=(35, 120),
+        color="#f58518",
+        edgecolor="black",
+        linewidth=0.5,
+        legend=False,
+    )
+    low_support = selected[selected["REM_support"] <= 15]
+    for row in low_support.itertuples(index=False):
+        ax.annotate(
+            row.participant_id,
+            (row.REM_support, row.REM_f1),
+            xytext=(5, 5),
+            textcoords="offset points",
+            fontsize=8,
+        )
+    ax.set_xlim(left=-3)
+    ax.set_ylim(-0.03, 0.55)
+    ax.set_xlabel("Participant REM epochs in held-out test set")
+    ax.set_ylabel("Participant REM F1")
+    ax.set_title("Low REM support makes participant-level REM F1 unstable")
+    plt.tight_layout()
+    plt.savefig(FIGURES / "rolling_participant_rem_support.png", dpi=160)
+    plt.close()
+
+
 def make_coefficient_contrast_figure() -> None:
     contrasts = pd.read_csv(ROLLING / "metrics" / "coefficient_contrasts.csv")
     subset = (
@@ -551,6 +653,26 @@ def write_artifact_manifest(key_results: pd.DataFrame) -> None:
                 "supports": "Rolling logistic interpretation",
             },
             {
+                "artifact": "summary/rolling_rem_prediction_composition.csv",
+                "source": (
+                    "outputs/runs/final_test_evaluation/"
+                    "rolling_logistic_interpretation/metrics/"
+                    "rem_error_predictions.csv"
+                ),
+                "metric_scope": "locked-test interpretation",
+                "supports": "REM overprediction limitation figure",
+            },
+            {
+                "artifact": "summary/rolling_participant_rem_support.csv",
+                "source": (
+                    "outputs/runs/final_test_evaluation/"
+                    "rolling_logistic_interpretation/metrics/"
+                    "per_participant_metrics.csv"
+                ),
+                "metric_scope": "locked-test interpretation",
+                "supports": "Low participant REM support limitation figure",
+            },
+            {
                 "artifact": "figures/postprocessing_tradeoff.png",
                 "source": (
                     "outputs/runs/final_test_evaluation/locked_test_metrics.csv; "
@@ -591,6 +713,26 @@ def write_artifact_manifest(key_results: pd.DataFrame) -> None:
                 "supports": "Transition-distance failure analysis",
             },
             {
+                "artifact": "figures/rolling_rem_prediction_composition.png",
+                "source": (
+                    "outputs/runs/final_test_evaluation/"
+                    "rolling_logistic_interpretation/metrics/"
+                    "rem_error_predictions.csv"
+                ),
+                "metric_scope": "locked-test interpretation",
+                "supports": "REM overprediction limitation figure",
+            },
+            {
+                "artifact": "figures/rolling_participant_rem_support.png",
+                "source": (
+                    "outputs/runs/final_test_evaluation/"
+                    "rolling_logistic_interpretation/metrics/"
+                    "per_participant_metrics.csv"
+                ),
+                "metric_scope": "locked-test interpretation",
+                "supports": "Low participant REM support limitation figure",
+            },
+            {
                 "artifact": "figures/rolling_logistic_rem_contrast.png",
                 "source": (
                     "outputs/runs/final_test_evaluation/"
@@ -627,6 +769,9 @@ curated evidence set.
   `summary/rolling_rem_error_counts.csv`, and
   `summary/rolling_transition_distance_metrics.csv` support the rolling
   logistic interpretation discussion.
+- `summary/rolling_rem_prediction_composition.csv` and
+  `summary/rolling_participant_rem_support.csv` support the README limitation
+  figures.
 - `summary/artifact_manifest.csv` maps each curated file to its source
   artifact, metric scope, and README claim.
 
@@ -643,6 +788,10 @@ curated evidence set.
   and XGBoost.
 - `figures/transition_distance_macro_f1.png` summarizes locked-test macro F1 by
   distance to the nearest true sleep-stage transition.
+- `figures/rolling_rem_prediction_composition.png` shows the true-label
+  composition of epochs predicted as `REM` by the raw rolling logistic model.
+- `figures/rolling_participant_rem_support.png` shows participant-level `REM`
+  F1 versus `REM` support for the threshold-tuned rolling logistic model.
 - `figures/rolling_logistic_rem_contrast.png` shows the largest standardized
   rolling-logistic coefficient contrasts for `REM` versus `Non-REM`.
 
@@ -673,24 +822,26 @@ models, alter the final held-out test protocol, or inspect raw DREAMT data.
 
 def _variant_label(candidate: str, variant: str) -> str:
     labels = {
-        ("best_original_ablation", "raw"): "Engineered logistic, raw",
+        ("best_original_ablation", "raw"): "All engineered-feature logistic",
         (
             "best_original_ablation",
             "platt_smoothed_threshold_tuned",
-        ): "Engineered logistic, post-processed",
-        ("interpretable_rolling_logistic", "raw"): "Rolling logistic, raw",
+        ): "All engineered-feature logistic",
+        ("interpretable_rolling_logistic", "raw"): (
+            "Movement + cardiovascular rolling logistic"
+        ),
         (
             "interpretable_rolling_logistic",
             "raw_threshold_tuned",
-        ): "Rolling logistic, threshold-tuned",
+        ): "Movement + cardiovascular rolling logistic",
         (
             "interpretable_rolling_logistic",
             "platt_threshold_tuned",
-        ): "Rolling logistic, Platt + threshold",
+        ): "Movement + cardiovascular rolling logistic",
         (
             "interpretable_rolling_logistic",
             "platt_smoothed_threshold_tuned",
-        ): "Rolling logistic, Platt + smoothing + threshold",
+        ): "Movement + cardiovascular rolling logistic",
     }
     return labels[(candidate, variant)]
 

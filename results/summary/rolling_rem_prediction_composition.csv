@@ -1,0 +1,4 @@
+true_label,n_epochs,display_order,fraction_of_predicted_rem
+Non-REM,3038,0,0.7315193835781363
+REM,708,1,0.17047917168312063
+Wake,407,2,0.09800144473874307
