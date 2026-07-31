@@ -53,22 +53,6 @@ Using the interpretable elastic-net logistic model, the figure below further ill
 
 ![Consequences of post-processing](results/figures/postprocessing_tradeoff.png)
 
-
-## Main Scientific Findings
-
-### REM Remained The Central Failure Mode
-
-REM was difficult even though the test split contained 1,318 REM epochs. Low
-participant-level support still matters: participant `S081` had zero REM epochs
-and `S050` had only 12. Their participant-level REM metrics are therefore
-unstable or undefined in a practical sense, but the global REM weakness cannot
-be dismissed as a support artifact.
-
-The raw rolling logistic model's REM error analysis makes the limitation clear:
-it correctly identified 708 REM epochs, but also predicted REM for 3,038 true
-`Non-REM` epochs and 407 true `Wake` epochs. The wearable features carried REM
-signal, but they did not cleanly separate REM from quiet `Non-REM`.
-
 ## Analysis of the Intepretable Logistic Model
 
 One of the main motivations for exploring simpler ML sleep-staging models in this project was to make the scientific implications clearer. Thus, with the goal of eliminating as much unnecessary complexity as possible, a logistic model was constructed based on the hypotheses:
@@ -95,14 +79,6 @@ The figure below illustrates coefficient contrasts between `REM` and `Non-REM`.
 
 ![Rolling logistic REM contrast](results/figures/rolling_logistic_rem_contrast.png)
 
-### REM Error Interpretation
-
-The raw rolling model often treated quiet `Non-REM` as REM. For example,
-`ACC_MAG_std_roll15_mean` was almost identical for true REM predicted REM
-(0.2975) and true `Non-REM` predicted REM (0.2990), while non-REM-related rows
-had a much higher mean value (0.8217). This supports a conservative conclusion:
-rolling wearable features contain REM-relevant information, but quiet `Non-REM`
-can look REM-like in this feature space.
 
 ## Validation Ablation Findings
 

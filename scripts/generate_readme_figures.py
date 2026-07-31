@@ -429,21 +429,9 @@ def make_transition_distance_figure() -> None:
         FINAL / "test_error_analysis" / "metrics" / "transition_distance_metrics.csv"
     )
     selected = metrics[
-        (
-            (metrics["candidate"] == "best_original_ablation")
-            & (metrics["variant"] == "platt_smoothed_threshold_tuned")
-        )
-        | (
-            (metrics["candidate"] == "interpretable_rolling_logistic")
-            & (metrics["variant"] == "raw_threshold_tuned")
-        )
+        (metrics["candidate"] == "interpretable_rolling_logistic")
+        & (metrics["variant"] == "raw_threshold_tuned")
     ].copy()
-    selected["model"] = [
-        _variant_label(candidate, variant)
-        for candidate, variant in zip(
-            selected["candidate"], selected["variant"], strict=True
-        )
-    ]
     order = ["0", "1", "2-3", "4-10", ">10"]
     selected = selected[selected["transition_distance_bin"].isin(order)].copy()
     selected["transition_distance_bin"] = pd.Categorical(
@@ -455,15 +443,14 @@ def make_transition_distance_figure() -> None:
         data=selected,
         x="transition_distance_bin",
         y="macro_f1",
-        hue="model",
         marker="o",
         sort=False,
+        color="#f58518",
     )
     ax.set_ylim(0.3, 0.58)
     ax.set_xlabel("Epochs from nearest true sleep-stage transition")
     ax.set_ylabel("Test macro F1")
     ax.set_title("Stable sleep-stage regions were easier than boundaries")
-    ax.legend(title="")
     plt.tight_layout()
     plt.savefig(FIGURES / "transition_distance_macro_f1.png", dpi=160)
     plt.close()
@@ -551,15 +538,6 @@ def make_participant_rem_support_figure() -> None:
         linewidth=0.5,
         legend=False,
     )
-    low_support = selected[selected["REM_support"] <= 15]
-    for row in low_support.itertuples(index=False):
-        ax.annotate(
-            row.participant_id,
-            (row.REM_support, row.REM_f1),
-            xytext=(5, 5),
-            textcoords="offset points",
-            fontsize=8,
-        )
     ax.set_xlim(left=-3)
     ax.set_ylim(-0.03, 0.55)
     ax.set_xlabel("Participant REM epochs in held-out test set")
