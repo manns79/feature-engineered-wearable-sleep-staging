@@ -115,14 +115,13 @@ feature-engineered-wearable-sleep-staging/
     raw/          # local DREAMT files; ignored
     interim/      # split assignments and epoch indexes
     processed/    # generated feature tables; ignored
-  docs/
-    final_test_protocol.md
   notebooks/
     01_data_exploration.ipynb
     02_feature_exploration.ipynb
     03_validation_error_analysis.ipynb
     04_locked_test_evaluation.ipynb
   results/
+    final_test_protocol.md
     summary/      # compact tracked metrics
     figures/      # README figures
   scripts/

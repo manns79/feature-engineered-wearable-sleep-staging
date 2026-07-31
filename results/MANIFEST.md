@@ -7,6 +7,7 @@ curated evidence set.
 
 ## Summary Files
 
+- `final_test_protocol.md` documents the frozen held-out test protocol.
 - `summary/key_results.csv` contains the README Key Results table, including
   the external deep-learning comparison row from the sibling repository.
 - `summary/validation_ablation_summary.csv` summarizes validation-only

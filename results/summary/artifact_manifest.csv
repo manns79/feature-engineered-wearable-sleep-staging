@@ -1,5 +1,6 @@
 artifact,source,metric_scope,supports
 summary/key_results.csv,outputs/runs/final_test_evaluation/final_comparison_table.csv and sibling dreamt-wearable-sleep-staging/results/summary/key_results.csv,locked test plus external comparison,README Key Results table
+final_test_protocol.md,manual protocol record,locked test,Frozen held-out test protocol
 summary/validation_ablation_summary.csv,outputs/runs/full_ablation_20260718/metrics/ablation_validation_metrics.csv,validation,Validation ablation findings
 summary/validation_feature_family_mean_metrics.csv,outputs/runs/full_ablation_20260718/metrics/ablation_validation_metrics.csv,validation,Feature-family ablation figure
 summary/validation_signal_group_mean_metrics.csv,outputs/runs/full_ablation_20260718/metrics/ablation_validation_metrics.csv,validation,Signal-group ablation figure

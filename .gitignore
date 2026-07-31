@@ -11,16 +11,10 @@ __pycache__/
 data/raw/*
 data/interim/*
 data/processed/*
-outputs/figures/*
-outputs/metrics/*
-outputs/models/*
-outputs/runs/
+outputs/
 
 # Keep directory structure and the fixed split assignment visible in git.
 !data/raw/.gitkeep
 !data/interim/.gitkeep
 !data/interim/split_assignments.csv
 !data/processed/.gitkeep
-!outputs/figures/.gitkeep
-!outputs/metrics/.gitkeep
-!outputs/models/.gitkeep

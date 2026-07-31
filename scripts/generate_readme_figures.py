@@ -594,6 +594,12 @@ def write_artifact_manifest(key_results: pd.DataFrame) -> None:
                 "supports": "README Key Results table",
             },
             {
+                "artifact": "final_test_protocol.md",
+                "source": "manual protocol record",
+                "metric_scope": "locked test",
+                "supports": "Frozen held-out test protocol",
+            },
+            {
                 "artifact": "summary/validation_ablation_summary.csv",
                 "source": (
                     "outputs/runs/full_ablation_20260718/metrics/"
@@ -736,6 +742,7 @@ curated evidence set.
 
 ## Summary Files
 
+- `final_test_protocol.md` documents the frozen held-out test protocol.
 - `summary/key_results.csv` contains the README Key Results table, including
   the external deep-learning comparison row from the sibling repository.
 - `summary/validation_ablation_summary.csv` summarizes validation-only
