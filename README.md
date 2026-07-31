@@ -31,7 +31,7 @@ This repository extends the [`dreamt-wearable-sleep-staging`](https://github.com
 
 ## Key Results
 
-The table below summarizes model performance. Per-class F1 scores are reported on the held-out test set. The last row in this table, transition-regularized 61-epoch MSResCNN-MLP-TCN, is the best performing model from [`dreamt-wearable-sleep-staging`](https://github.com/manns79/dreamt-wearable-sleep-staging). The value shown in bold in each column denotes the highest obtained value of the corresponding F1 score. Notice that several traditional ML models, which are considerably simpler, achieve performance comparable to the DL benchmark. 
+The table below summarizes model performance. Per-class F1 scores are reported on the held-out test set. The last row in this table, transition-regularized 61-epoch MSResCNN-MLP-TCN, is the best performing model from [`dreamt-wearable-sleep-staging`](https://github.com/manns79/dreamt-wearable-sleep-staging). The value shown in bold in each column denotes the highest obtained value of the corresponding F1 score.
 
 | Model | Validation macro F1 | Test macro F1 | Wake F1 | Non-REM F1 | REM F1 |
 | ----- | ------------------: | ------------: | ------: | ---------: | -----: |
@@ -152,50 +152,7 @@ ablations, but the best overall validation model and the final locked-test
 winner both used elastic-net logistic regression. XGBoost was not meaningfully
 better than logistic regression in the final feature-family comparisons.
 
-## Technical Approach
 
-The engineered feature table combines:
-
-- basic within-epoch statistical summaries;
-- signal-specific physiological and movement features;
-- centered rolling temporal-context features over neighboring epochs;
-- whole-night participant-normalized features.
-
-Concrete examples include accelerometer motion intensity and magnitude energy,
-BVP summary behavior, EDA rise/fall features, temperature and heart-rate drift,
-short-window IBI/HRV proxies such as RMSSD and pNN50, and rolling means and
-standard deviations around each epoch.
-
-The scope is retrospective within-night sleep staging. Centered rolling features
-use both earlier and later neighboring epochs, and whole-night normalization uses
-the participant's complete recording. Those decisions are appropriate for this
-analysis target but are not streaming-compatible real-time inference.
-
-Evaluated models included sanity-check dummy baselines, elastic-net multinomial
-logistic regression, random forest, and XGBoost. Elastic-net logistic regression
-became the most important family because it produced the best final result and
-supported the most useful interpretation.
-
-## Dataset And Evaluation Design
-
-This project uses [DREAMT](https://physionet.org/content/dreamt/2.2.0/)
-wearable physiological signals, including `BVP`, accelerometry, temperature,
-EDA, HR, and IBI. PSG labels `N1`, `N2`, and `N3` are mapped to `Non-REM`,
-preparation epochs are excluded, and the final task is `Wake` versus `Non-REM`
-versus `REM`. The earlier repository contains the fuller dataset and cohort
-description.
-
-Evaluation safeguards:
-
-- fixed participant-level train/validation/test split reused from the earlier
-  project;
-- participant-grouped cross-validation on training participants;
-- validation-only model, ablation, and exploratory error-analysis decisions;
-- train-OOF fitting of Platt calibration, class thresholds, and smoothing
-  choices;
-- one locked held-out test evaluation after the final protocol was frozen;
-- macro F1 as the primary metric because accuracy can obscure minority-class
-  failure.
 
 ## End-To-End Workflow
 
@@ -210,108 +167,6 @@ The repository implements an end-to-end applied ML workflow:
 7. frozen held-out test evaluation;
 8. transition, participant-level, and REM-focused failure analysis;
 9. curated result artifacts and reproducible README visualizations.
-
-## Skills Demonstrated
-
-**Machine learning and statistical modeling**
-
-- Elastic-net multinomial logistic regression, random forest, XGBoost, and
-  sanity-check baselines.
-- Participant-grouped cross-validation and class-imbalance-aware macro-F1
-  evaluation.
-- Feature-family and signal-group ablations.
-- Probability calibration, class-threshold tuning, temporal smoothing, and
-  validation-only sequence decoding experiments.
-- Coefficient interpretation, native feature importance, permutation
-  importance, and optional SHAP summaries.
-
-**Biomedical time-series analysis**
-
-- Processing multimodal wearable signals from DREAMT.
-- Physiological feature engineering for movement, cardiovascular,
-  electrodermal, and temperature signals.
-- Temporal-context construction and participant-level normalization.
-- Sleep-stage transition analysis and participant-level failure analysis.
-- REM-focused error grouping for physiological interpretation.
-
-**Machine-learning engineering**
-
-- Modular Python source code rather than notebook-only analysis.
-- Reproducible command-line experiment scripts.
-- Manifest-driven feature and ablation definitions.
-- Train-only preprocessing and post-processing selection.
-- Frozen held-out test protocol.
-- Automated tests, linting support, structured experiment outputs, curated
-  result artifacts, and reproducible visualizations.
-
-## Limitations And Future Work
-
-- REM performance remains weak, and REM behavior is sensitive to calibration
-  and thresholding.
-- Errors are concentrated near sleep-stage transitions.
-- Participant-level performance is heterogeneous, and participant-level REM
-  metrics are unstable when REM support is very low.
-- Centered rolling features and whole-night normalization make the primary
-  workflow retrospective rather than real-time.
-- Results are from one dataset and one fixed participant-level split.
-- Wearable signals are indirect proxies for PSG-defined sleep stage.
-
-Future work could include external validation on another wearable sleep dataset,
-participant-specific calibration or adaptation, methods designed specifically to
-distinguish REM from quiet `Non-REM`, streaming-compatible alternatives to
-centered rolling and whole-night normalization, and uncertainty estimates around
-class-level and participant-level metrics.
-
-## Project Takeaway
-
-Carefully engineered temporal and physiological features allowed classical ML to
-approach the earlier deep-learning benchmark on the same wearable sleep-staging
-task. The interpretable rolling logistic model remained competitive and
-preserved more REM sensitivity, but reliable REM classification remains the main
-open challenge.
-
-## Curated Results Artifacts
-
-The tracked `results/` directory contains compact artifacts that support this
-README:
-
-- [results/summary/key_results.csv](results/summary/key_results.csv) contains
-  the Key Results table and model-name crosswalk fields.
-- [results/summary/validation_ablation_summary.csv](results/summary/validation_ablation_summary.csv)
-  summarizes validation-only ablation findings.
-- [results/summary/coefficient_contrast_summary.csv](results/summary/coefficient_contrast_summary.csv)
-  supports the rolling logistic interpretation.
-- [results/MANIFEST.md](results/MANIFEST.md) documents each curated file and
-  its source artifact.
-
-Figures are regenerated from saved summary artifacts with:
-
-```bash
-python scripts/generate_readme_figures.py
-```
-
-The script does not train models, tune hyperparameters, or reopen the locked
-held-out test protocol.
-
-## Repository Entry Points
-
-- [src/features/](src/features/) contains the physiological feature-engineering
-  modules.
-- [src/models/ablations.py](src/models/ablations.py) defines manifest-driven
-  ablation experiments.
-- [src/models/rolling_logistic_experiment.py](src/models/rolling_logistic_experiment.py)
-  implements the pruned interpretable rolling logistic experiment.
-- [src/models/calibration.py](src/models/calibration.py) and
-  [src/models/sequence_postprocessing.py](src/models/sequence_postprocessing.py)
-  implement calibration, thresholds, smoothing, and sequence post-processing.
-- [src/models/locked_test_evaluation.py](src/models/locked_test_evaluation.py)
-  contains the frozen final evaluation logic.
-- [src/models/rolling_logistic_interpretation.py](src/models/rolling_logistic_interpretation.py)
-  generates the final interpretation artifacts.
-- [notebooks/03_validation_error_analysis.ipynb](notebooks/03_validation_error_analysis.ipynb)
-  reviews validation-stage failure analysis.
-- [notebooks/04_locked_test_evaluation.ipynb](notebooks/04_locked_test_evaluation.ipynb)
-  reviews the already-frozen locked-test artifacts.
 
 ## Repository Structure
 
@@ -394,3 +249,21 @@ or reproduce the frozen final artifacts intentionally:
 python scripts/run_final_test_evaluation.py
 python scripts/run_rolling_logistic_interpretation.py
 ```
+
+## Limitations And Future Work
+
+- REM performance remains weak, and REM behavior is sensitive to calibration
+  and thresholding.
+- Errors are concentrated near sleep-stage transitions.
+- Participant-level performance is heterogeneous, and participant-level REM
+  metrics are unstable when REM support is very low.
+- Centered rolling features and whole-night normalization make the primary
+  workflow retrospective rather than real-time.
+- Results are from one dataset and one fixed participant-level split.
+- Wearable signals are indirect proxies for PSG-defined sleep stage.
+
+Future work could include external validation on another wearable sleep dataset,
+participant-specific calibration or adaptation, methods designed specifically to
+distinguish REM from quiet `Non-REM`, streaming-compatible alternatives to
+centered rolling and whole-night normalization, and uncertainty estimates around
+class-level and participant-level metrics.
