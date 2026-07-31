@@ -20,8 +20,9 @@ curated evidence set.
 
 ## Figures
 
-- `figures/postprocessing_tradeoff.png` compares test macro F1 and REM F1
-  across selected raw and post-processed variants.
+- `figures/postprocessing_tradeoff.png` compares test macro F1, Wake F1,
+  Non-REM F1, and REM F1 across the main interpretable rolling logistic
+  variants.
 - `figures/transition_distance_macro_f1.png` summarizes locked-test macro F1 by
   distance to the nearest true sleep-stage transition.
 - `figures/rolling_logistic_rem_contrast.png` shows the largest standardized
@@ -36,10 +37,10 @@ identifiers are preserved in `summary/key_results.csv`:
 | --- | --- | --- |
 | Majority-class baseline | majority_class_baseline | raw |
 | Stratified-random baseline | stratified_class_baseline | raw |
-| Statistical-summary elastic-net logistic, post-processed | statistical_summary_only | platt_smoothed_threshold_tuned |
-| Engineered-feature elastic-net logistic, post-processed | best_original_ablation | platt_smoothed_threshold_tuned |
-| Interpretable rolling logistic, raw | interpretable_rolling_logistic | raw |
-| Interpretable rolling logistic, threshold-tuned | interpretable_rolling_logistic | raw_threshold_tuned |
+| Statistical-summary logistic, Platt + smoothing + thresholding | statistical_summary_only | platt_smoothed_threshold_tuned |
+| All engineered-feature logistic, Platt + smoothing + thresholding | best_original_ablation | platt_smoothed_threshold_tuned |
+| Movement + cardiovascular rolling logistic, raw | interpretable_rolling_logistic | raw |
+| Movement + cardiovascular rolling logistic, thresholding | interpretable_rolling_logistic | raw_threshold_tuned |
 | Previous project: transition-regularized 61-epoch MSResCNN-MLP-TCN | stage19_best_equal_weight_seed_ensemble_lambda_0.05 | external_comparison |
 
 ## Regeneration

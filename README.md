@@ -24,7 +24,7 @@ This repository extends the [`dreamt-wearable-sleep-staging`](https://github.com
 - **Comparison to DL benchmark:** The previous project's transition-regularized
   61-epoch MSResCNN-MLP-TCN reached **0.501** test macro F1 on the same label
   mapping and participant-level split.
-- **Most interpretable model:** The pruned rolling elastic-net logistic
+- **Interpretable model with comparable performance:** The pruned rolling elastic-net logistic
   model remained close to the best feature-engineered model after threshold
   tuning, **0.492** test macro F1, while exposing readable coefficient-level
   associations.
@@ -37,21 +37,21 @@ The table below summarizes model performance. Per-class F1 scores are reported o
 | ----- | ------------------: | ------------: | ------: | ---------: | -----: |
 | Majority-class baseline | 0.276 | 0.266 | 0.000 | **0.797** | 0.000 |
 | Stratified-random baseline | 0.326 | 0.337 | 0.248 | 0.649 | 0.114 |
-| Statistical-summary elastic-net logistic, post-processed | 0.438 | 0.445 | 0.542 | 0.689 | 0.105 |
-| Engineered-feature elastic-net logistic, post-processed | **0.520** | 0.497 | 0.549 | 0.775 | 0.167 |
-| Interpretable rolling logistic, raw | 0.410 | 0.468 | 0.556 | 0.589 | **0.259** |
-| Interpretable rolling logistic, threshold-tuned | 0.481 | 0.492 | 0.553 | 0.727 | 0.196 |
+| Statistical-summary logistic, Platt + smoothing + thresholding | 0.438 | 0.445 | 0.542 | 0.689 | 0.105 |
+| All engineered-feature logistic, Platt + smoothing + thresholding | **0.520** | 0.497 | 0.549 | 0.775 | 0.167 |
+| Movement + cardiovascular rolling logistic, raw | 0.410 | 0.468 | 0.556 | 0.589 | **0.259** |
+| Movement + cardiovascular rolling logistic, thresholding | 0.481 | 0.492 | 0.553 | 0.727 | 0.196 |
 | transition-regularized 61-epoch MSResCNN-MLP-TCN | 0.510 | **0.501** | **0.564** | 0.793 | 0.146 |
 
 Interpretation:
 - The best performing traditional ML model, which used all feature and signal families, achieved performance comparable to the DL benchmark.
-- After threshold tuning, an intepretable elastic-net logistic model that only used rolling context features from the movement and cardiovascular signal families also achieved performance comparable to the DL benchmark (see the next-to-last row).
+- After threshold tuning, an interpretable elastic-net logistic model that only used rolling context features from the movement and cardiovascular signal families also achieved performance comparable to the DL benchmark (see the next-to-last row).
 - Generally, Platt scaling improved probability calibration but not necessarily macro F1; probability smoothing had little to no effect; and per-class threshold tuning improved performance by reducing overprediction of REM.  
 
 
-Using the intepretable elastic-net logistic model, the figure below further illustrates the consequences of the different post-processing techniques used. 
+Using the interpretable elastic-net logistic model, the figure below further illustrates the consequences of the different post-processing techniques used.
 
-![Post-processing tradeoff](results/figures/postprocessing_tradeoff.png)
+![Consequences of post-processing](results/figures/postprocessing_tradeoff.png)
 
 
 ## Main Scientific Findings
@@ -227,4 +227,4 @@ python scripts/run_rolling_logistic_interpretation.py
 
 - Given the relative success of disinguishing `Wake` from `Non-REM` and `REM`, hierarchical modeling may improve performance on sleep states.
 - Results suggest that temporal-context, movement signals, and cardiovascular signals are informative; however, verifying these conclusions on datasets other than DREAMT would strengthen results. 
-- To help assess whether additional complexity earns its keep in this problem, quantify the difference in training time between traditional ML and DL models. 
+- To help assess whether additional complexity earns its keep in this problem, quantify the difference in training time between traditional ML and DL models.

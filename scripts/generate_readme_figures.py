@@ -31,16 +31,19 @@ DISPLAY_NAMES = {
     (
         "statistical_summary_only",
         "platt_smoothed_threshold_tuned",
-    ): "Statistical-summary elastic-net logistic, post-processed",
+    ): "Statistical-summary logistic, Platt + smoothing + thresholding",
     (
         "best_original_ablation",
         "platt_smoothed_threshold_tuned",
-    ): "Engineered-feature elastic-net logistic, post-processed",
-    ("interpretable_rolling_logistic", "raw"): "Interpretable rolling logistic, raw",
+    ): "All engineered-feature logistic, Platt + smoothing + thresholding",
+    (
+        "interpretable_rolling_logistic",
+        "raw",
+    ): "Movement + cardiovascular rolling logistic, raw",
     (
         "interpretable_rolling_logistic",
         "raw_threshold_tuned",
-    ): "Interpretable rolling logistic, threshold-tuned",
+    ): "Movement + cardiovascular rolling logistic, thresholding",
 }
 
 
@@ -176,49 +179,46 @@ def write_interpretation_summary() -> None:
 def make_postprocessing_tradeoff_figure() -> None:
     metrics = pd.read_csv(FINAL / "locked_test_metrics.csv")
     selected = metrics[
-        (
-            (metrics["candidate"] == "interpretable_rolling_logistic")
-            & metrics["variant"].isin(
-                [
-                    "raw",
-                    "raw_threshold_tuned",
-                    "platt_threshold_tuned",
-                    "platt_smoothed_threshold_tuned",
-                ]
-            )
-        )
-        | (
-            (metrics["candidate"] == "best_original_ablation")
-            & metrics["variant"].isin(["raw", "platt_smoothed_threshold_tuned"])
+        (metrics["candidate"] == "interpretable_rolling_logistic")
+        & metrics["variant"].isin(
+            [
+                "raw",
+                "raw_threshold_tuned",
+                "platt_threshold_tuned",
+                "platt_smoothed_threshold_tuned",
+            ]
         )
     ].copy()
     selected["display_name"] = [
-        _variant_label(candidate, variant)
-        for candidate, variant in zip(
-            selected["candidate"], selected["variant"], strict=True
-        )
+        _postprocessing_variant_label(variant)
+        for variant in selected["variant"]
     ]
     plot_frame = selected.melt(
         id_vars=["display_name"],
-        value_vars=["macro_f1", "REM_f1"],
+        value_vars=["macro_f1", "Wake_f1", "Non_REM_f1", "REM_f1"],
         var_name="metric",
         value_name="score",
     )
-    metric_names = {"macro_f1": "Test macro F1", "REM_f1": "Test REM F1"}
+    metric_names = {
+        "macro_f1": "Macro F1",
+        "Wake_f1": "Wake F1",
+        "Non_REM_f1": "Non-REM F1",
+        "REM_f1": "REM F1",
+    }
     plot_frame["metric"] = plot_frame["metric"].map(metric_names)
 
-    plt.figure(figsize=(10, 4.8))
+    plt.figure(figsize=(10, 5.2))
     ax = sns.barplot(
         data=plot_frame,
         x="score",
         y="display_name",
         hue="metric",
-        palette=["#4c78a8", "#f58518"],
+        palette=["#4c78a8", "#54a24b", "#72b7b2", "#f58518"],
     )
-    ax.set_xlim(0, 0.6)
+    ax.set_xlim(0, 0.85)
     ax.set_xlabel("F1 score")
     ax.set_ylabel("")
-    ax.set_title("Post-processing changes macro F1 and REM sensitivity")
+    ax.set_title("Consequences of post-processing")
     ax.legend(title="")
     plt.tight_layout()
     plt.savefig(FIGURES / "postprocessing_tradeoff.png", dpi=160)
@@ -390,8 +390,9 @@ curated evidence set.
 
 ## Figures
 
-- `figures/postprocessing_tradeoff.png` compares test macro F1 and REM F1
-  across selected raw and post-processed variants.
+- `figures/postprocessing_tradeoff.png` compares test macro F1, Wake F1,
+  Non-REM F1, and REM F1 across the main interpretable rolling logistic
+  variants.
 - `figures/transition_distance_macro_f1.png` summarizes locked-test macro F1 by
   distance to the nearest true sleep-stage transition.
 - `figures/rolling_logistic_rem_contrast.png` shows the largest standardized
@@ -444,6 +445,16 @@ def _variant_label(candidate: str, variant: str) -> str:
         ): "Rolling logistic, Platt + smoothing + threshold",
     }
     return labels[(candidate, variant)]
+
+
+def _postprocessing_variant_label(variant: str) -> str:
+    labels = {
+        "raw": "Raw",
+        "raw_threshold_tuned": "Thresholding",
+        "platt_threshold_tuned": "Platt + thresholding",
+        "platt_smoothed_threshold_tuned": "Platt + smoothing + thresholding",
+    }
+    return labels[variant]
 
 
 if __name__ == "__main__":
