@@ -1,6 +1,6 @@
 # Feature-Engineered Machine Learning for Wearable Sleep Staging
 
-This repository extends the [`dreamt-wearable-sleep-staging`](https://github.com/manns79/dreamt-wearable-sleep-staging) project. Refer to the previous project's README for details about the DREAMT dataset. 
+This repository extends the [`dreamt-wearable-sleep-staging`](https://github.com/manns79/dreamt-wearable-sleep-staging) project. Refer to the previous project's `README.md` for details about the DREAMT dataset. 
 
 ## Executive Summary
 
@@ -31,11 +31,7 @@ This repository extends the [`dreamt-wearable-sleep-staging`](https://github.com
 
 ## Key Results
 
-These rows summarize the final held-out test comparison plus the previous
-project's best deep model. The deep model was trained in the sibling repository,
-not here, but the comparison is meaningful because both projects reuse the same
-three-class label mapping and participant-level split. Differences of only a few
-thousandths should not be interpreted as statistically significant.
+The table below summarizes model performance. Per-class F1 scores are reported on the held-out test set. The last row in this table, transition-regularized 61-epoch MSResCNN-MLP-TCN, contains results for the best performing model from [`dreamt-wearable-sleep-staging`](https://github.com/manns79/dreamt-wearable-sleep-staging). The value shown in bold in each column denotes the best value of the corresponding metric. Notice that several traditional ML model, which are considerably simpler, achieve performance comparable to the DL benchmark. 
 
 | Model | Validation macro F1 | Test macro F1 | Wake F1 | Non-REM F1 | REM F1 |
 | ----- | ------------------: | ------------: | ------: | ---------: | -----: |
