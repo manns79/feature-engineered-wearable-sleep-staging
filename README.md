@@ -134,7 +134,7 @@ The repository implements an end-to-end applied ML workflow:
 6. calibration, threshold, smoothing, and sequence post-processing experiments;
 7. frozen held-out test evaluation;
 8. transition, participant-level, and REM-focused failure analysis;
-9. curated result artifacts and reproducible README visualizations.
+9. curated result artifacts.
 
 ## Repository Structure
 
@@ -194,10 +194,7 @@ python scripts/build_epoch_index.py
 python scripts/build_features.py
 ```
 
-`scripts/copy_previous_split.py` reuses the fixed split assignments from the
-sibling project. If the sibling repository is not adjacent to this one, pass the
-appropriate source path to the script or place a compatible
-`data/interim/split_assignments.csv` file locally.
+`scripts/copy_previous_split.py` reuses the fixed split assignments from the previous project. If the [`dreamt-wearable-sleep-staging`](https://github.com/manns79/dreamt-wearable-sleep-staging) repository is not adjacent to this one, pass the appropriate source path to the script or place a compatible `data/interim/split_assignments.csv` file locally.
 
 Run the main validation-stage experiments:
 
@@ -209,29 +206,25 @@ python scripts/run_rolling_logistic_experiment.py \
   --run-id rolling_logistic_train_oof_postprocessed_YYYYMMDD
 ```
 
-The final test protocol has already been spent for the results in this README.
-Do not rerun final-test commands merely while editing documentation. To review
-or reproduce the frozen final artifacts intentionally:
+Run the final-test evaluation and analysis of the interpretable logistic model:
 
 ```bash
 python scripts/run_final_test_evaluation.py
 python scripts/run_rolling_logistic_interpretation.py
 ```
 
-## Limitations And Future Work
+## Limitations
 
-- REM performance remains weak, and REM behavior is sensitive to calibration
+- Movement features help separate `Wake` from sleep states; however, as illustrated below using the interpretable logistic model, "quiet" `Non-REM` is often treated as `REM`.
   and thresholding.
-- Errors are concentrated near sleep-stage transitions.
-- Participant-level performance is heterogeneous, and participant-level REM
-  metrics are unstable when REM support is very low.
-- Centered rolling features and whole-night normalization make the primary
-  workflow retrospective rather than real-time.
-- Results are from one dataset and one fixed participant-level split.
-- Wearable signals are indirect proxies for PSG-defined sleep stage.
+- Model performance declines near sleep-stage transitions. 
 
-Future work could include external validation on another wearable sleep dataset,
-participant-specific calibration or adaptation, methods designed specifically to
-distinguish REM from quiet `Non-REM`, streaming-compatible alternatives to
-centered rolling and whole-night normalization, and uncertainty estimates around
-class-level and participant-level metrics.
+![Transition-distance macro F1](results/figures/transition_distance_macro_f1.png)
+
+- `REM` support (i.e., the number of `REM` epochs) is very low for certain participants, which makes participant-level performance difficult to assess. 
+
+## Future work
+
+- Given the relative success of disinguishing `Wake` from `Non-REM` and `REM`, hierarchical modeling may improve performance on sleep states.
+- Results suggest that temporal-context, movement signals, and cardiovascular signals are informative; however, verifying these conclusions on datasets other than DREAMT would strengthen results. 
+- To help assess whether additional complexity earns its keep in this problem, quantify the difference in training time between traditional ML and DL models. 
