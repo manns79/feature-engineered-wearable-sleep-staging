@@ -37,6 +37,7 @@ include = ["src*"]
 line-length = 88
 target-version = "py310"
 src = ["src", "scripts", "tests"]
+extend-exclude = ["notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
@@ -50,4 +51,3 @@ line-ending = "auto"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-

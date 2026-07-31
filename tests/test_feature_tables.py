@@ -1,10 +1,10 @@
 import pandas as pd
 from src.data.make_epochs import build_epoch_index
 from src.features.build_features import (
+    _participant_zscore_source_columns,
     build_and_write_feature_tables,
     build_basic_feature_table,
     build_rich_feature_table,
-    _participant_zscore_source_columns,
     write_split_feature_tables,
 )
 

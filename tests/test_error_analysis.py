@@ -301,6 +301,10 @@ def test_permutation_importance_supports_encoded_label_model_artifacts(tmp_path)
     assert set(importance["feature"]) == {"BVP_mean", "HR_mean"}
 
 
+@pytest.mark.filterwarnings(
+    "ignore:`y1`, `y2` and `labels` have only one label in common:"
+    "sklearn.exceptions.UndefinedMetricWarning"
+)
 def test_run_locked_test_error_analysis_writes_compact_test_outputs(tmp_path):
     features_path = tmp_path / "features_test.csv"
     predictions_path = tmp_path / "locked_test_predictions.csv"

@@ -4,7 +4,6 @@ from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-
 from src.models.locked_test_evaluation import (
     FinalPriorModelSpec,
     _fit_prior_postprocessors,
@@ -100,7 +99,6 @@ def test_prior_postprocessing_uses_train_oof_and_applies_to_split(tmp_path):
                 LogisticRegression(
                     class_weight="balanced",
                     max_iter=1000,
-                    multi_class="auto",
                 ),
             ),
         ]

@@ -1,5 +1,4 @@
 import pandas as pd
-
 from src.models.rolling_logistic_interpretation import (
     coefficient_contrast_frame,
     contrast_summary_frame,

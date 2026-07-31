@@ -12,8 +12,6 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from src.config import TARGET_LABELS
-from src.features.build_features import FEATURE_ID_COLUMNS
 from src.models.error_analysis import (
     add_prediction_context,
     add_transition_context,

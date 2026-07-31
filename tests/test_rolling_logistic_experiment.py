@@ -126,6 +126,7 @@ def test_locked_test_evaluation_is_separate_from_validation_experiment(tmp_path)
 
     outputs = run_locked_test_evaluation(
         rolling_run_dir=experiment.run_dir,
+        validation_features_path=val_path,
         test_features_path=test_path,
     )
 
@@ -135,7 +136,6 @@ def test_locked_test_evaluation_is_separate_from_validation_experiment(tmp_path)
         "logistic_raw",
         "logistic_threshold_tuned",
         "logistic_platt",
-        "logistic_platt_viterbi",
         "logistic_platt_threshold_tuned",
         "logistic_platt_smoothed",
         "logistic_platt_smoothed_threshold_tuned",
