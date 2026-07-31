@@ -31,7 +31,7 @@ This repository extends the [`dreamt-wearable-sleep-staging`](https://github.com
 
 ## Key Results
 
-The table below summarizes model performance. Per-class F1 scores are reported on the held-out test set. The last row in this table, transition-regularized 61-epoch MSResCNN-MLP-TCN, contains results for the best performing model from [`dreamt-wearable-sleep-staging`](https://github.com/manns79/dreamt-wearable-sleep-staging). The value shown in bold in each column denotes the best value of the corresponding metric. Notice that several traditional ML model, which are considerably simpler, achieve performance comparable to the DL benchmark. 
+The table below summarizes model performance. Per-class F1 scores are reported on the held-out test set. The last row in this table, transition-regularized 61-epoch MSResCNN-MLP-TCN, is the best performing model from [`dreamt-wearable-sleep-staging`](https://github.com/manns79/dreamt-wearable-sleep-staging). The value shown in bold in each column denotes the highest obtained value of the corresponding F1 score. Notice that several traditional ML models, which are considerably simpler, achieve performance comparable to the DL benchmark. 
 
 | Model | Validation macro F1 | Test macro F1 | Wake F1 | Non-REM F1 | REM F1 |
 | ----- | ------------------: | ------------: | ------: | ---------: | -----: |
@@ -41,78 +41,21 @@ The table below summarizes model performance. Per-class F1 scores are reported o
 | Engineered-feature elastic-net logistic, post-processed | **0.520** | 0.497 | 0.549 | 0.775 | 0.167 |
 | Interpretable rolling logistic, raw | 0.410 | 0.468 | 0.556 | 0.589 | **0.259** |
 | Interpretable rolling logistic, threshold-tuned | 0.481 | 0.492 | 0.553 | 0.727 | 0.196 |
-| Previous project: transition-regularized 61-epoch MSResCNN-MLP-TCN | 0.510 | **0.501** | **0.564** | 0.793 | 0.146 |
+| transition-regularized 61-epoch MSResCNN-MLP-TCN | 0.510 | **0.501** | **0.564** | 0.793 | 0.146 |
 
-The best feature-engineered model reached approximately 0.497 test macro F1,
-within 0.004 of the earlier deep-learning benchmark. The interpretable rolling
-logistic model reached approximately 0.492 after threshold tuning. Its raw
-variant sacrificed macro F1 but preserved more REM signal than the stronger
-macro-F1 operating points.
+Interpretation:
+- The best performing traditional ML model, which used all feature and signal families, achieved performance comparable to the DL benchmark.
+- After threshold tuning, an intepretable elastic-net logistic model that only used rolling context features from the movement and cardiovascular signal families also achieved performance comparable to the DL benchmark (see the next-to-last row).
+- Generally, Platt scaling improved probability calibration but not necessarily macro F1; probability smoothing had little to no effect; and per-class threshold tuning improved performance by reducing overprediction of REM.  
+
+
+Using the intepretable elastic-net logistic model, the figure below further illustrates the consequences of the different post-processing techniques used. 
 
 ![Post-processing tradeoff](results/figures/postprocessing_tradeoff.png)
 
-*Post-processing changed the operating point, especially for REM. The raw
-rolling logistic model retained more REM F1, while thresholded variants improved
-macro F1 by reducing false REM predictions.*
 
 ## Main Scientific Findings
 
-### Classical ML Approached The Deep-Learning Benchmark
-
-The central positive result is that a classical feature-engineered model came
-very close to the previous deep-learning benchmark on the same split. The
-engineered-feature elastic-net logistic model reached 0.497 test macro F1, while
-the previous transition-regularized MSResCNN-MLP-TCN reached 0.501.
-
-This does not prove that classical ML is universally preferable. It does show
-that careful temporal and physiological feature engineering can produce a strong
-performance-versus-complexity tradeoff. The comparison is useful because the
-classical model is architecturally simple, and the logistic variants support
-direct feature-level interpretation that is much harder to obtain from the deep
-sequence model.
-
-### The Interpretable Model Remained Competitive
-
-The pruned rolling elastic-net logistic model was designed for interpretation:
-it uses a constrained set of rolling cardiovascular and movement-context
-features, deterministic train-only correlation pruning, and elastic-net
-regularization. It did not produce the highest final macro F1, but it remained
-close to the best feature-engineered model after threshold tuning.
-
-The model is scientifically useful because it exposes a real tradeoff. Its raw
-predictions had the strongest REM F1 among the main final candidates, but this
-came from high REM recall and many false REM predictions, particularly among
-true `Non-REM` epochs. Threshold tuning improved macro F1 by moving the model to
-a more conservative REM operating point.
-
-### Post-Processing Changed The Class Tradeoff
-
-Post-processing was not cosmetic. It changed which scientific conclusion one
-would draw from the same base model.
-
-Platt calibration by itself often increased accuracy or shifted probabilities
-toward `Non-REM` while sharply suppressing REM predictions. For the rolling
-logistic model, Platt-only test accuracy was 0.709, but REM F1 was 0.000. The
-best engineered-feature ablation showed a similar pattern: Platt-only test
-accuracy was 0.715, but REM F1 was only 0.011.
-
-Class-threshold tuning was the main source of macro-F1 improvement. The raw
-rolling logistic model moved from 0.468 test macro F1 to 0.492 with raw
-threshold tuning. For the best engineered-feature ablation, Platt plus threshold
-tuning reached 0.493, and adding probability smoothing produced a modest
-increase to 0.497.
-
-This distinction matters:
-
-- probability calibration changes the probability scale;
-- class-threshold tuning changes the decision rule;
-- temporal smoothing changes output probabilities across neighboring epochs;
-- rolling input features provide temporal context before the classifier makes
-  predictions.
-
-Viterbi decoding was explored during validation for the rolling logistic model,
-but it collapsed REM recall in the saved validation artifacts and was not part
-of the final locked-test roster.
 
 ### Stable Epochs Were Easier Than Transition Epochs
 
