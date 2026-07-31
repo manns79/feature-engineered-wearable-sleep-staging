@@ -56,20 +56,6 @@ Using the interpretable elastic-net logistic model, the figure below further ill
 
 ## Main Scientific Findings
 
-
-### Stable Epochs Were Easier Than Transition Epochs
-
-Errors were worse near true sleep-stage transitions. For the best final
-feature-engineered model, locked-test macro F1 improved from 0.395 on transition
-epochs to 0.461 one epoch away, 0.501 two to three epochs away, and 0.544 four
-to ten epochs away.
-
-![Transition-distance macro F1](results/figures/transition_distance_macro_f1.png)
-
-*Performance generally improved away from true sleep-stage boundaries. This
-supports the interpretation that stable sleep regions are easier to classify
-than physiologically ambiguous transition regions.*
-
 ### REM Remained The Central Failure Mode
 
 REM was difficult even though the test split contained 1,318 REM epochs. Low
@@ -90,7 +76,7 @@ One of the main motivations for exploring simpler ML sleep-staging models in thi
 2. the cardiovascular signal family helps distinguish `Non-REM` from `REM`; and 
 3. temporal-context features align well with the sequential nature of sleep.
 
-To further simplify this logistic model, the training data was used to compute correlations between candidate features, then a deterministic rule was used to eliminate redundancies. The result was a logistic model that used 25 temporal-context features from the cardiovascular and movement signal families. As shown by the key results, the performance of this model was comparable to the DL benchmark.
+To further simplify this logistic model, the training data was used to compute correlations between candidate features, then a deterministic rule was used to eliminate redundancies. The result was a logistic model that used 25 temporal-context features from the cardiovascular and movement signal families. As demonstrated by the key results, the performance of this model was comparable to the DL benchmark.
 
 
 ### Coefficient-Level Interpretation
@@ -101,9 +87,11 @@ Coefficients of the interpretable logistic model were analyzed to try to shed li
 - `Wake` vs `Non-REM`: +0.767
 - `REM` vs `Wake`: -1.716
 
-As one expects based on intuition, this suggests that sustained movement variability pushes the model towards `Wake`, while less movement variability pushes the model towards sleep-like states. 
+As one expects based on intuition, this suggests that sustained movement variability pushes the model towards `Wake`, while less movement variability pushes the model towards sleep  states.
 
 Temporal-context features from the cardiovascular family contributed to `REM` versus `Non-REM` separation. Positive `REM` contrasts included `HR_mean_roll5_std` (+0.527), `IBI_mean_roll5_std` (+0.315), and `IBI_pnn50_roll15_std` (+0.276). On the other hand, `IBI_pnn50_roll15_mean` pushed away from both `Wake` and `REM` toward `Non-REM`, consistent with the model using sustained HRV-like context as a Non-REM signal.
+
+The figure below illustrates coefficient contrasts between `REM` and `Non-REM`.
 
 ![Rolling logistic REM contrast](results/figures/rolling_logistic_rem_contrast.png)
 

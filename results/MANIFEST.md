@@ -22,7 +22,9 @@ curated evidence set.
 
 - `figures/postprocessing_tradeoff.png` compares test macro F1, Wake F1,
   Non-REM F1, and REM F1 across the main interpretable rolling logistic
-  variants.
+  variants. The smoothing-only row is derived from saved raw locked-test
+  probabilities using the train-OOF-selected smoothing window; other rows come
+  directly from `outputs/runs/final_test_evaluation/locked_test_metrics.csv`.
 - `figures/transition_distance_macro_f1.png` summarizes locked-test macro F1 by
   distance to the nearest true sleep-stage transition.
 - `figures/rolling_logistic_rem_contrast.png` shows the largest standardized

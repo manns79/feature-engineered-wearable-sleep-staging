@@ -12,6 +12,11 @@ os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from sklearn.metrics import f1_score
+
+from src.config import TARGET_LABELS
+from src.models.calibration import probability_columns, probability_frame
+from src.models.sequence_postprocessing import smooth_probabilities_by_participant
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -22,6 +27,9 @@ FIGURES = RESULTS / "figures"
 FINAL = ROOT / "outputs" / "runs" / "final_test_evaluation"
 ABLATION = ROOT / "outputs" / "runs" / "full_ablation_20260718"
 ROLLING = FINAL / "rolling_logistic_interpretation"
+ROLLING_RUN = (
+    ROOT / "outputs" / "runs" / "rolling_logistic_train_oof_postprocessed_20260724"
+)
 PREVIOUS = ROOT.parent / "dreamt-wearable-sleep-staging" / "results" / "summary"
 
 
@@ -177,6 +185,15 @@ def write_interpretation_summary() -> None:
 
 
 def make_postprocessing_tradeoff_figure() -> None:
+    variant_order = [
+        "raw",
+        "platt",
+        "raw_smoothed",
+        "platt_smoothed",
+        "raw_threshold_tuned",
+        "platt_threshold_tuned",
+        "platt_smoothed_threshold_tuned",
+    ]
     metrics = pd.read_csv(FINAL / "locked_test_metrics.csv")
     selected = metrics[
         (metrics["candidate"] == "interpretable_rolling_logistic")
@@ -184,17 +201,27 @@ def make_postprocessing_tradeoff_figure() -> None:
             [
                 "raw",
                 "raw_threshold_tuned",
+                "platt",
+                "platt_smoothed",
                 "platt_threshold_tuned",
                 "platt_smoothed_threshold_tuned",
             ]
         )
     ].copy()
+    selected = pd.concat(
+        [selected, derived_raw_smoothing_metrics()],
+        ignore_index=True,
+    )
+    selected["display_order"] = selected["variant"].map(
+        {variant: index for index, variant in enumerate(variant_order)}
+    )
+    selected = selected.sort_values("display_order")
     selected["display_name"] = [
         _postprocessing_variant_label(variant)
         for variant in selected["variant"]
     ]
     plot_frame = selected.melt(
-        id_vars=["display_name"],
+        id_vars=["display_name", "display_order"],
         value_vars=["macro_f1", "Wake_f1", "Non_REM_f1", "REM_f1"],
         var_name="metric",
         value_name="score",
@@ -206,8 +233,9 @@ def make_postprocessing_tradeoff_figure() -> None:
         "REM_f1": "REM F1",
     }
     plot_frame["metric"] = plot_frame["metric"].map(metric_names)
+    plot_frame = plot_frame.sort_values("display_order")
 
-    plt.figure(figsize=(10, 5.2))
+    plt.figure(figsize=(10, 6.2))
     ax = sns.barplot(
         data=plot_frame,
         x="score",
@@ -223,6 +251,46 @@ def make_postprocessing_tradeoff_figure() -> None:
     plt.tight_layout()
     plt.savefig(FIGURES / "postprocessing_tradeoff.png", dpi=160)
     plt.close()
+
+
+def derived_raw_smoothing_metrics() -> pd.DataFrame:
+    """Compute raw probability smoothing metrics from saved locked-test outputs."""
+    predictions = pd.read_csv(FINAL / "locked_test_predictions.csv")
+    raw = predictions[
+        (predictions["candidate"] == "interpretable_rolling_logistic")
+        & (predictions["variant"] == "raw")
+    ].copy()
+    run_config = pd.read_json(ROLLING_RUN / "run_config.json", typ="series")
+    probabilities = raw[probability_columns()].to_numpy(dtype=float)
+    smoothed_probabilities = smooth_probabilities_by_participant(
+        raw,
+        probabilities,
+        window_epochs=int(run_config["selected_smoothing_window"]),
+    )
+    smoothed = probability_frame(raw, smoothed_probabilities)
+    labels = raw["true_label"].to_numpy()
+    predicted = smoothed["pred_label"].to_numpy()
+    row = {
+        "candidate": "interpretable_rolling_logistic",
+        "variant": "raw_smoothed",
+        "macro_f1": f1_score(
+            labels,
+            predicted,
+            labels=TARGET_LABELS,
+            average="macro",
+            zero_division=0,
+        ),
+    }
+    for label in TARGET_LABELS:
+        key = label.replace("-", "_")
+        row[f"{key}_f1"] = f1_score(
+            labels,
+            predicted,
+            labels=[label],
+            average="macro",
+            zero_division=0,
+        )
+    return pd.DataFrame([row])
 
 
 def make_transition_distance_figure() -> None:
@@ -337,7 +405,12 @@ def write_artifact_manifest(key_results: pd.DataFrame) -> None:
             {
                 "artifact": "figures/postprocessing_tradeoff.png",
                 "source": (
-                    "outputs/runs/final_test_evaluation/locked_test_metrics.csv"
+                    "outputs/runs/final_test_evaluation/locked_test_metrics.csv; "
+                    "smoothing-only row derived from "
+                    "outputs/runs/final_test_evaluation/locked_test_predictions.csv "
+                    "with the train-OOF-selected smoothing window in "
+                    "outputs/runs/rolling_logistic_train_oof_postprocessed_20260724/"
+                    "run_config.json"
                 ),
                 "metric_scope": "locked test",
                 "supports": "Post-processing operating-point tradeoff",
@@ -392,7 +465,9 @@ curated evidence set.
 
 - `figures/postprocessing_tradeoff.png` compares test macro F1, Wake F1,
   Non-REM F1, and REM F1 across the main interpretable rolling logistic
-  variants.
+  variants. The smoothing-only row is derived from saved raw locked-test
+  probabilities using the train-OOF-selected smoothing window; other rows come
+  directly from `outputs/runs/final_test_evaluation/locked_test_metrics.csv`.
 - `figures/transition_distance_macro_f1.png` summarizes locked-test macro F1 by
   distance to the nearest true sleep-stage transition.
 - `figures/rolling_logistic_rem_contrast.png` shows the largest standardized
@@ -451,6 +526,9 @@ def _postprocessing_variant_label(variant: str) -> str:
     labels = {
         "raw": "Raw",
         "raw_threshold_tuned": "Thresholding",
+        "platt": "Platt",
+        "raw_smoothed": "Smoothing",
+        "platt_smoothed": "Platt + smoothing",
         "platt_threshold_tuned": "Platt + thresholding",
         "platt_smoothed_threshold_tuned": "Platt + smoothing + thresholding",
     }
