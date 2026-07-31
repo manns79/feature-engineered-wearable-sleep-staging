@@ -1,19 +1,6 @@
 # Feature-Engineered Machine Learning for Wearable Sleep Staging
 
-This repository extends the sibling
-[`dreamt-wearable-sleep-staging`](https://github.com/manns79/dreamt-wearable-sleep-staging)
-project on the same DREAMT wearable sleep-staging task: classifying each
-30-second epoch as `Wake`, `Non-REM`, or `REM`. The earlier project compared
-traditional baselines with deep learning models. This project asks whether
-richer physiological feature engineering and classical machine-learning models
-can approach that performance while remaining simpler and, for a pruned rolling
-logistic model, substantially more interpretable.
-
-The answer is nuanced. A feature-engineered elastic-net logistic model reached
-nearly the same held-out test macro F1 as the previous best deep model, but REM
-classification remained weak and highly sensitive to post-processing choices.
-Macro F1 is the average of the per-class F1 scores, so it gives equal weight to
-`Wake`, `Non-REM`, and the less frequent `REM` class.
+This repository extends the [`dreamt-wearable-sleep-staging`](https://github.com/manns79/dreamt-wearable-sleep-staging) project. Refer to the previous project's README for details about the DREAMT dataset. 
 
 ## Executive Summary
 
@@ -31,21 +18,16 @@ Macro F1 is the average of the per-class F1 scores, so it gives equal weight to
   whole-night participant-normalized features.
 - **Model families:** Majority and stratified dummy baselines, elastic-net
   multinomial logistic regression, random forest, and XGBoost.
-- **Best test macro F1:** Feature-engineered elastic-net logistic regression
+- **Best performing model:** Feature-engineered elastic-net logistic regression
   with train-OOF Platt calibration, probability smoothing, and class-threshold
   tuning reached **0.497** test macro F1.
-- **External comparison:** The previous project's transition-regularized
+- **Comparison to DL benchmark:** The previous project's transition-regularized
   61-epoch MSResCNN-MLP-TCN reached **0.501** test macro F1 on the same label
   mapping and participant-level split.
-- **Best REM sensitivity:** The raw interpretable rolling logistic model had
-  lower test macro F1, **0.468**, but the strongest REM F1 among the main final
-  candidates, **0.259**, with REM recall **0.537**.
-- **Preferred interpretation target:** The pruned rolling elastic-net logistic
+- **Most interpretable model:** The pruned rolling elastic-net logistic
   model remained close to the best feature-engineered model after threshold
   tuning, **0.492** test macro F1, while exposing readable coefficient-level
   associations.
-- **Central limitation:** REM remained the principal failure mode; calibration
-  and thresholding changed the REM operating point substantially.
 
 ## Key Results
 
