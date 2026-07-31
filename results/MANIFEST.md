@@ -11,6 +11,9 @@ curated evidence set.
   the external deep-learning comparison row from the sibling repository.
 - `summary/validation_ablation_summary.csv` summarizes validation-only
   feature-family and signal-group ablation findings.
+- `summary/validation_feature_family_mean_metrics.csv` and
+  `summary/validation_signal_group_mean_metrics.csv` average validation F1
+  metrics across the learned model families for README ablation figures.
 - `summary/coefficient_contrast_summary.csv`,
   `summary/rolling_rem_error_counts.csv`, and
   `summary/rolling_transition_distance_metrics.csv` support the rolling
@@ -25,6 +28,10 @@ curated evidence set.
   variants. The smoothing-only row is derived from saved raw locked-test
   probabilities using the train-OOF-selected smoothing window; other rows come
   directly from `outputs/runs/final_test_evaluation/locked_test_metrics.csv`.
+- `figures/validation_feature_family_ablation.png` and
+  `figures/validation_signal_group_ablation.png` summarize validation macro and
+  per-class F1 averaged across elastic-net logistic regression, random forest,
+  and XGBoost.
 - `figures/transition_distance_macro_f1.png` summarizes locked-test macro F1 by
   distance to the nearest true sleep-stage transition.
 - `figures/rolling_logistic_rem_contrast.png` shows the largest standardized

@@ -54,14 +54,48 @@ DISPLAY_NAMES = {
     ): "Movement + cardiovascular rolling logistic, thresholding",
 }
 
+LEARNED_MODEL_FAMILIES = (
+    "elastic_net_logistic_regression",
+    "random_forest",
+    "xgboost",
+)
+VALIDATION_F1_COLUMNS = ["macro_f1", "Wake_f1", "Non_REM_f1", "REM_f1"]
+F1_LABELS = {
+    "macro_f1": "Macro F1",
+    "Wake_f1": "Wake F1",
+    "Non_REM_f1": "Non-REM F1",
+    "REM_f1": "REM F1",
+}
+F1_HUE_ORDER = ["Macro F1", "Wake F1", "Non-REM F1", "REM F1"]
+F1_PALETTE = {
+    "Macro F1": "#4c78a8",
+    "Wake F1": "#54a24b",
+    "Non-REM F1": "#72b7b2",
+    "REM F1": "#f58518",
+}
+FEATURE_FAMILY_ABLATIONS = [
+    ("basic_statistical", "Statistical"),
+    ("basic_plus_signal_specific", "+ Signal-specific"),
+    ("basic_signal_specific_rolling", "+ Rolling context"),
+    ("basic_signal_specific_rolling_subject_norm", "+ Subject norm"),
+]
+SIGNAL_GROUP_ABLATIONS = [
+    ("signal_group_movement", "Movement"),
+    ("signal_group_cardiovascular", "Cardiovascular"),
+    ("signal_group_electrodermal", "Electrodermal"),
+    ("signal_group_temperature", "Temperature"),
+]
+
 
 def main() -> None:
     SUMMARY.mkdir(parents=True, exist_ok=True)
     FIGURES.mkdir(parents=True, exist_ok=True)
     key_results = write_key_results()
     write_ablation_summary()
+    write_validation_ablation_mean_metrics()
     write_interpretation_summary()
     make_postprocessing_tradeoff_figure()
+    make_validation_ablation_figures()
     make_transition_distance_figure()
     make_coefficient_contrast_figure()
     write_artifact_manifest(key_results)
@@ -170,6 +204,51 @@ def write_ablation_summary() -> pd.DataFrame:
     return output
 
 
+def write_validation_ablation_mean_metrics() -> None:
+    write_validation_ablation_mean_metric_file(
+        FEATURE_FAMILY_ABLATIONS,
+        SUMMARY / "validation_feature_family_mean_metrics.csv",
+    )
+    write_validation_ablation_mean_metric_file(
+        SIGNAL_GROUP_ABLATIONS,
+        SUMMARY / "validation_signal_group_mean_metrics.csv",
+    )
+
+
+def write_validation_ablation_mean_metric_file(
+    ablations: list[tuple[str, str]],
+    output_path: Path,
+) -> pd.DataFrame:
+    metrics = pd.read_csv(ABLATION / "metrics" / "ablation_validation_metrics.csv")
+    order = {ablation: index for index, (ablation, _) in enumerate(ablations)}
+    labels = dict(ablations)
+    selected = metrics[
+        metrics["ablation"].isin(order)
+        & metrics["model"].isin(LEARNED_MODEL_FAMILIES)
+    ].copy()
+    output = (
+        selected.groupby("ablation", as_index=False)[VALIDATION_F1_COLUMNS]
+        .mean()
+        .assign(
+            display_name=lambda frame: frame["ablation"].map(labels),
+            display_order=lambda frame: frame["ablation"].map(order),
+            averaged_model_families="|".join(LEARNED_MODEL_FAMILIES),
+        )
+        .sort_values("display_order")
+    )
+    output = output[
+        [
+            "display_order",
+            "ablation",
+            "display_name",
+            "averaged_model_families",
+            *VALIDATION_F1_COLUMNS,
+        ]
+    ]
+    output.to_csv(output_path, index=False)
+    return output
+
+
 def write_interpretation_summary() -> None:
     files = {
         "coefficient_contrast_summary.csv": (
@@ -241,7 +320,8 @@ def make_postprocessing_tradeoff_figure() -> None:
         x="score",
         y="display_name",
         hue="metric",
-        palette=["#4c78a8", "#54a24b", "#72b7b2", "#f58518"],
+        hue_order=F1_HUE_ORDER,
+        palette=F1_PALETTE,
     )
     ax.set_xlim(0, 0.85)
     ax.set_xlabel("F1 score")
@@ -291,6 +371,56 @@ def derived_raw_smoothing_metrics() -> pd.DataFrame:
             zero_division=0,
         )
     return pd.DataFrame([row])
+
+
+def make_validation_ablation_figures() -> None:
+    feature_families = pd.read_csv(
+        SUMMARY / "validation_feature_family_mean_metrics.csv"
+    )
+    signal_groups = pd.read_csv(SUMMARY / "validation_signal_group_mean_metrics.csv")
+    make_validation_ablation_figure(
+        feature_families,
+        FIGURES / "validation_feature_family_ablation.png",
+        "Feature-family ablations",
+    )
+    make_validation_ablation_figure(
+        signal_groups,
+        FIGURES / "validation_signal_group_ablation.png",
+        "Signal-group ablations",
+    )
+
+
+def make_validation_ablation_figure(
+    summary: pd.DataFrame,
+    output_path: Path,
+    title: str,
+) -> None:
+    plot_frame = summary.melt(
+        id_vars=["display_name", "display_order"],
+        value_vars=VALIDATION_F1_COLUMNS,
+        var_name="metric",
+        value_name="score",
+    )
+    plot_frame["metric"] = plot_frame["metric"].map(F1_LABELS)
+    plot_frame = plot_frame.sort_values("display_order")
+
+    plt.figure(figsize=(9.8, 4.8))
+    ax = sns.barplot(
+        data=plot_frame,
+        x="score",
+        y="display_name",
+        hue="metric",
+        hue_order=F1_HUE_ORDER,
+        palette=F1_PALETTE,
+    )
+    ax.set_xlim(0, 0.7)
+    ax.set_xlabel("Validation F1 score")
+    ax.set_ylabel("")
+    ax.set_title(title)
+    ax.legend(title="")
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=160)
+    plt.close()
 
 
 def make_transition_distance_figure() -> None:
@@ -393,6 +523,24 @@ def write_artifact_manifest(key_results: pd.DataFrame) -> None:
                 "supports": "Validation ablation findings",
             },
             {
+                "artifact": "summary/validation_feature_family_mean_metrics.csv",
+                "source": (
+                    "outputs/runs/full_ablation_20260718/metrics/"
+                    "ablation_validation_metrics.csv"
+                ),
+                "metric_scope": "validation",
+                "supports": "Feature-family ablation figure",
+            },
+            {
+                "artifact": "summary/validation_signal_group_mean_metrics.csv",
+                "source": (
+                    "outputs/runs/full_ablation_20260718/metrics/"
+                    "ablation_validation_metrics.csv"
+                ),
+                "metric_scope": "validation",
+                "supports": "Signal-group ablation figure",
+            },
+            {
                 "artifact": "summary/coefficient_contrast_summary.csv",
                 "source": (
                     "outputs/runs/final_test_evaluation/"
@@ -414,6 +562,24 @@ def write_artifact_manifest(key_results: pd.DataFrame) -> None:
                 ),
                 "metric_scope": "locked test",
                 "supports": "Post-processing operating-point tradeoff",
+            },
+            {
+                "artifact": "figures/validation_feature_family_ablation.png",
+                "source": (
+                    "outputs/runs/full_ablation_20260718/metrics/"
+                    "ablation_validation_metrics.csv"
+                ),
+                "metric_scope": "validation",
+                "supports": "Feature-family ablation figure",
+            },
+            {
+                "artifact": "figures/validation_signal_group_ablation.png",
+                "source": (
+                    "outputs/runs/full_ablation_20260718/metrics/"
+                    "ablation_validation_metrics.csv"
+                ),
+                "metric_scope": "validation",
+                "supports": "Signal-group ablation figure",
             },
             {
                 "artifact": "figures/transition_distance_macro_f1.png",
@@ -454,6 +620,9 @@ curated evidence set.
   the external deep-learning comparison row from the sibling repository.
 - `summary/validation_ablation_summary.csv` summarizes validation-only
   feature-family and signal-group ablation findings.
+- `summary/validation_feature_family_mean_metrics.csv` and
+  `summary/validation_signal_group_mean_metrics.csv` average validation F1
+  metrics across the learned model families for README ablation figures.
 - `summary/coefficient_contrast_summary.csv`,
   `summary/rolling_rem_error_counts.csv`, and
   `summary/rolling_transition_distance_metrics.csv` support the rolling
@@ -468,6 +637,10 @@ curated evidence set.
   variants. The smoothing-only row is derived from saved raw locked-test
   probabilities using the train-OOF-selected smoothing window; other rows come
   directly from `outputs/runs/final_test_evaluation/locked_test_metrics.csv`.
+- `figures/validation_feature_family_ablation.png` and
+  `figures/validation_signal_group_ablation.png` summarize validation macro and
+  per-class F1 averaged across elastic-net logistic regression, random forest,
+  and XGBoost.
 - `figures/transition_distance_macro_f1.png` summarizes locked-test macro F1 by
   distance to the nearest true sleep-stage transition.
 - `figures/rolling_logistic_rem_contrast.png` shows the largest standardized

@@ -1,7 +1,11 @@
 artifact,source,metric_scope,supports
 summary/key_results.csv,outputs/runs/final_test_evaluation/final_comparison_table.csv and sibling dreamt-wearable-sleep-staging/results/summary/key_results.csv,locked test plus external comparison,README Key Results table
 summary/validation_ablation_summary.csv,outputs/runs/full_ablation_20260718/metrics/ablation_validation_metrics.csv,validation,Validation ablation findings
+summary/validation_feature_family_mean_metrics.csv,outputs/runs/full_ablation_20260718/metrics/ablation_validation_metrics.csv,validation,Feature-family ablation figure
+summary/validation_signal_group_mean_metrics.csv,outputs/runs/full_ablation_20260718/metrics/ablation_validation_metrics.csv,validation,Signal-group ablation figure
 summary/coefficient_contrast_summary.csv,outputs/runs/final_test_evaluation/rolling_logistic_interpretation/metrics/coefficient_contrast_summary.csv,locked-test interpretation,Rolling logistic interpretation
 figures/postprocessing_tradeoff.png,outputs/runs/final_test_evaluation/locked_test_metrics.csv; smoothing-only row derived from outputs/runs/final_test_evaluation/locked_test_predictions.csv with the train-OOF-selected smoothing window in outputs/runs/rolling_logistic_train_oof_postprocessed_20260724/run_config.json,locked test,Post-processing operating-point tradeoff
+figures/validation_feature_family_ablation.png,outputs/runs/full_ablation_20260718/metrics/ablation_validation_metrics.csv,validation,Feature-family ablation figure
+figures/validation_signal_group_ablation.png,outputs/runs/full_ablation_20260718/metrics/ablation_validation_metrics.csv,validation,Signal-group ablation figure
 figures/transition_distance_macro_f1.png,outputs/runs/final_test_evaluation/test_error_analysis/metrics/transition_distance_metrics.csv,locked-test error analysis,Transition-distance failure analysis
 figures/rolling_logistic_rem_contrast.png,outputs/runs/final_test_evaluation/rolling_logistic_interpretation/metrics/coefficient_contrasts.csv,locked-test interpretation,Interpretable rolling logistic coefficient contrasts

@@ -1,0 +1,5 @@
+display_order,ablation,display_name,averaged_model_families,macro_f1,Wake_f1,Non_REM_f1,REM_f1
+0,basic_statistical,Statistical,elastic_net_logistic_regression|random_forest|xgboost,0.37802783111407995,0.3791184015480243,0.5404197041654017,0.21454538762881378
+1,basic_plus_signal_specific,+ Signal-specific,elastic_net_logistic_regression|random_forest|xgboost,0.38011604197341514,0.3823089295348682,0.5457044768129323,0.2123347195724449
+2,basic_signal_specific_rolling,+ Rolling context,elastic_net_logistic_regression|random_forest|xgboost,0.4438341434794489,0.47054114347905784,0.5774300372905773,0.28353124966871174
+3,basic_signal_specific_rolling_subject_norm,+ Subject norm,elastic_net_logistic_regression|random_forest|xgboost,0.46197961870906235,0.46863178258208577,0.6042353008016875,0.31307177274341363

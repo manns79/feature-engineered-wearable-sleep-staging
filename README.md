@@ -108,7 +108,11 @@ can look REM-like in this feature space.
 
 The first set of ablation experiments focused on feature families: within-epoch statistical summaries, signal-specific physiological features, centered rolling temporal-context features, and whole-night participant-normalized features. These signal families were added sequentially to each model family. As illustrated by the figure below, results indicate that temporal-context features carry the most information.
 
-The second set of ablation experiments focused on signal groups: movement, cardiovascular, electrodermal, and skin temperature. Each model family used a single signal group for prediction, then the experiment iterated through the different signal groups. The results, summarized by the figure below, suggest that movement and cardiovascular signals are the most predictive. 
+![Feature-family validation ablations](results/figures/validation_feature_family_ablation.png)
+
+The second set of ablation experiments focused on signal groups: movement, cardiovascular, electrodermal, and skin temperature. Each model family used a single signal group for prediction, then the experiment iterated through the different signal groups. The results, summarized by the figure below, suggest that movement and cardiovascular signals are the most predictive.
+
+![Signal-group validation ablations](results/figures/validation_signal_group_ablation.png)
 
 ## End-To-End Workflow
 

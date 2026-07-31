@@ -1,0 +1,5 @@
+display_order,ablation,display_name,averaged_model_families,macro_f1,Wake_f1,Non_REM_f1,REM_f1
+0,signal_group_movement,Movement,elastic_net_logistic_regression|random_forest|xgboost,0.43726258398765916,0.45727723121142677,0.6091565984186939,0.24535392233285688
+1,signal_group_cardiovascular,Cardiovascular,elastic_net_logistic_regression|random_forest|xgboost,0.4176230919583501,0.3887856141023393,0.5582425696238033,0.30584109214890787
+2,signal_group_electrodermal,Electrodermal,elastic_net_logistic_regression|random_forest|xgboost,0.34546986121378315,0.3680177249219591,0.49941928300159927,0.16897257571779103
+3,signal_group_temperature,Temperature,elastic_net_logistic_regression|random_forest|xgboost,0.37379367532013874,0.3698929971750722,0.5792432937405878,0.17224473504475626
