@@ -83,46 +83,29 @@ it correctly identified 708 REM epochs, but also predicted REM for 3,038 true
 `Non-REM` epochs and 407 true `Wake` epochs. The wearable features carried REM
 signal, but they did not cleanly separate REM from quiet `Non-REM`.
 
-## Interpretable Rolling Logistic Model
+## Analysis of the Intepretable Logistic Model
 
-The final interpretation phase focused on the raw rolling logistic model because
-its coefficients describe the fitted classifier directly. Post-processing
-variants are better understood as operating-point changes, not as feature-level
-associations.
+One of the main motivations for exploring simpler ML sleep-staging models in this project was to make the scientific implications clearer. Thus, with the goal of eliminating as much unnecessary complexity as possible, a logistic model was constructed based on the hypotheses:
+1. the movement signal family helps distinguish `Wake` from `Sleep`;
+2. the cardiovascular signal family helps distinguish `Non-REM` from `REM`; and 
+3. temporal-context features align well with the sequential nature of sleep.
 
-The selected rolling model uses 25 train-pruned features from cardiovascular and
-movement signal groups. Candidate features were defined from the feature
-manifest, correlations were computed on training data only, and redundant
-rolling-window features were pruned deterministically before grouped
-cross-validation tuning. Post-processing choices were fit from participant-held-
-out training predictions, not validation or test labels.
+To further simplify this logistic model, the training data was used to compute correlations between candidate features, then a deterministic rule was used to eliminate redundancies. The result was a logistic model that used 25 temporal-context features from the cardiovascular and movement signal families. As shown by the key results, the performance of this model was comparable to the DL benchmark.
+
 
 ### Coefficient-Level Interpretation
 
-The strongest coefficient contrasts were movement-context features, especially
-`ACC_MAG_std_roll15_mean`:
+Coefficients of the interpretable logistic model were analyzed to try to shed light on the scientific implications. The strongest coefficient contrasts were temporal-context features from the movement family, especially `ACC_MAG_std_roll15_mean`:
 
 - `REM` vs `Non-REM`: -0.949
 - `Wake` vs `Non-REM`: +0.767
 - `REM` vs `Wake`: -1.716
 
-This suggests that the model's largest axis is sustained movement variability:
-more movement-like context pushes toward `Wake`, while low movement variability
-pushes toward sleep-like states, including REM. This is an association learned
-by a standardized logistic model, not a causal physiological claim.
+As one expects based on intuition, this suggests that sustained movement variability pushes the model towards `Wake`, while less movement variability pushes the model towards sleep-like states. 
 
-Autonomic rolling features also contributed to `REM` versus `Non-REM`
-separation. Positive `REM` contrasts included `HR_mean_roll5_std` (+0.527),
-`IBI_mean_roll5_std` (+0.315), and `IBI_pnn50_roll15_std` (+0.276). In contrast,
-`IBI_pnn50_roll15_mean` pushed away from both `Wake` and `REM` toward
-`Non-REM`, consistent with the model using sustained HRV-like context as a
-Non-REM signal.
+Temporal-context features from the cardiovascular family contributed to `REM` versus `Non-REM` separation. Positive `REM` contrasts included `HR_mean_roll5_std` (+0.527), `IBI_mean_roll5_std` (+0.315), and `IBI_pnn50_roll15_std` (+0.276). On the other hand, `IBI_pnn50_roll15_mean` pushed away from both `Wake` and `REM` toward `Non-REM`, consistent with the model using sustained HRV-like context as a Non-REM signal.
 
 ![Rolling logistic REM contrast](results/figures/rolling_logistic_rem_contrast.png)
-
-*The rolling logistic model mainly distinguished REM from Non-REM through low
-movement variability plus short-window HR/IBI variability. These are model
-associations, not causal physiological effects.*
 
 ### REM Error Interpretation
 
@@ -135,24 +118,9 @@ can look REM-like in this feature space.
 
 ## Validation Ablation Findings
 
-Ablations were selected and interpreted on validation data only. They were not
-used to retrospectively choose models after seeing the locked test set.
+The first set of ablation experiments focused on feature families: within-epoch statistical summaries, signal-specific physiological features, centered rolling temporal-context features, and whole-night participant-normalized features. These signal families were added sequentially to each model family. As illustrated by the figure below, results indicate that temporal-context features carry the most information.
 
-Adding signal-specific features to basic statistical summaries did not improve
-the best validation macro F1 by itself: 0.385 for basic summaries versus 0.385
-for basic plus signal-specific features. Rolling temporal context produced the
-larger jump: the best cumulative rolling-context model reached 0.452. Adding
-whole-night participant-normalized features produced the strongest validation
-model, an elastic-net logistic regression at 0.470.
-
-Among individual signal groups, movement was strongest on validation
-(0.456), followed by cardiovascular features (0.425), temperature (0.385), and
-electrodermal features (0.381). Random forest was competitive in several
-ablations, but the best overall validation model and the final locked-test
-winner both used elastic-net logistic regression. XGBoost was not meaningfully
-better than logistic regression in the final feature-family comparisons.
-
-
+The second set of ablation experiments focused on signal groups: movement, cardiovascular, electrodermal, and skin temperature. Each model family used a single signal group for prediction, then the experiment iterated through the different signal groups. The results, summarized by the figure below, suggest that movement and cardiovascular signals are the most predictive. 
 
 ## End-To-End Workflow
 
